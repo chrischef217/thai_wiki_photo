@@ -211,17 +211,12 @@ app.get('/', async (c) => {
         <!-- 모바일 최적화 광고 배너 -->
         <div class="bg-white shadow-sm border-b">
             <div class="px-3 py-3 sm:px-4 sm:py-4">
-                <!-- 광고 사이즈 안내 -->
-                <div class="mb-2 text-center">
-                    <p class="text-xs text-gray-500">광고 배너 (권장사이즈: 350x120px 모바일 / 1200x120px 데스크톱)</p>
-                </div>
                 <div id="ad-banner" class="h-20 sm:h-24 md:h-28 bg-gradient-to-r from-pink-100 to-purple-100 rounded-lg overflow-hidden relative">
                     <div id="ad-slider" class="flex transition-transform duration-500 ease-in-out h-full">
                         <!-- 광고 이미지들이 동적으로 로드됩니다 -->
                         <div class="min-w-full h-full bg-gradient-to-r from-pink-200 to-purple-200 flex items-center justify-center">
                             <p class="text-gray-600 text-xs sm:text-sm text-center px-2">
-                                <i class="fas fa-ad mr-2"></i>광고 배너 영역<br>
-                                <span class="text-xs">모바일: 350x120px / 데스크톱: 1200x120px</span>
+                                <i class="fas fa-ad mr-2"></i>광고 배너 영역
                             </p>
                         </div>
                     </div>
