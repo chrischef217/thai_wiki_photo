@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>파일 업로드 테스트</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-8">
+    <div class="max-w-md mx-auto bg-white rounded-lg shadow-md p-6">
+        <h1 class="text-2xl font-bold mb-6">파일 업로드 테스트</h1>
+        
+        <form id="uploadForm" enctype="multipart/form-data">
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">이미지 파일 선택</label>
+                <input type="file" id="photoInput" accept="image/*" 
+                       class="w-full p-3 border border-gray-300 rounded-lg">
+            </div>
+            
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">테스트 정보</label>
+                <input type="text" id="nicknameInput" placeholder="닉네임 입력" 
+                       class="w-full p-3 border border-gray-300 rounded-lg">
+            </div>
+            
+            <button type="submit" 
+                    class="w-full bg-blue-500 hover:bg-blue-600 text-white p-3 rounded-lg font-medium">
+                업로드 테스트
+            </button>
+        </form>
+        
+        <div id="result" class="mt-6 hidden">
+            <h3 class="font-bold mb-2">결과:</h3>
+            <div id="resultContent" class="p-3 bg-gray-50 rounded"></div>
+        </div>
+        
+        <div id="preview" class="mt-6 hidden">
+            <h3 class="font-bold mb-2">미리보기:</h3>
+            <img id="previewImage" class="max-w-full h-48 object-cover rounded">
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('uploadForm');
+        const photoInput = document.getElementById('photoInput');
+        const nicknameInput = document.getElementById('nicknameInput');
+        const result = document.getElementById('result');
+        const resultContent = document.getElementById('resultContent');
+        const preview = document.getElementById('preview');
+        const previewImage = document.getElementById('previewImage');
+
+        // 파일 선택 시 미리보기
+        photoInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                console.log('선택된 파일:', file.name, file.size, 'bytes', file.type);
+                
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    previewImage.src = e.target.result;
+                    preview.classList.remove('hidden');
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        form.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const file = photoInput.files[0];
+            const nickname = nicknameInput.value || 'test-upload';
+            
+            if (!file) {
+                alert('파일을 선택해주세요.');
+                return;
+            }
+
+            console.log('업로드 시작:', file.name, file.size, 'bytes');
+
+            const formData = new FormData();
+            formData.append('user_id', 'filetest' + Date.now());
+            formData.append('password', '1234');
+            formData.append('nickname', nickname);
+            formData.append('age', '25');
+            formData.append('height', '165');
+            formData.append('weight', '50');
+            formData.append('gender', '여자');
+            formData.append('region', '방콕');
+            formData.append('line_id', 'testline');
+            formData.append('phone', '01012345678');
+            formData.append('photos', file);
+
+            try {
+                resultContent.textContent = '업로드 중...';
+                result.classList.remove('hidden');
+
+                const response = await fetch('/api/auth/working-girl/register', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    resultContent.innerHTML = `
+                        <div class="text-green-600">
+                            <strong>✓ 성공!</strong><br>
+                            ${data.message}
+                        </div>
+                    `;
+                } else {
+                    resultContent.innerHTML = `
+                        <div class="text-red-600">
+                            <strong>✗ 실패:</strong><br>
+                            ${data.message}
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('업로드 오류:', error);
+                resultContent.innerHTML = `
+                    <div class="text-red-600">
+                        <strong>✗ 오류:</strong><br>
+                        ${error.message}
+                    </div>
+                `;
+            }
+        });
+    </script>
+</body>
+</html>

@@ -246,6 +246,8 @@ app.get('/', async (c) => {
             </div>
         </div>
 
+
+
         <!-- 모바일 최적화 워킹걸 리스트 -->
         <div class="px-3 py-4 sm:px-4 sm:py-8">
             <div id="working-girls-list" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 sm:gap-4 lg:gap-6">
@@ -284,6 +286,60 @@ app.get('/', async (c) => {
 
         <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
         <script src="/static/app.js"></script>
+        
+        <!-- 사진 표시 문제 해결을 위한 테스트 스크립트 -->
+        <script>
+        // 페이지 로드 후 즉시 실행되는 테스트
+        setTimeout(() => {
+            console.log('=== 사진 표시 디버깅 시작 ===');
+            
+            // API 응답 직접 테스트 (강제 새로고침)
+            fetch('/api/v2/profiles?_=' + Date.now() + '&t=' + new Date().getTime(), {
+                cache: 'no-cache',
+                headers: {
+                    'Cache-Control': 'no-cache',
+                    'Pragma': 'no-cache'
+                }
+            })
+                .then(response => response.json())
+                .then(data => {
+                    console.log('직접 API 호출 결과:', data);
+                    
+                    if (data.working_girls && data.working_girls.length > 0) {
+                        data.working_girls.forEach((girl, index) => {
+                            console.log(\`프로필 \${index + 1}: \${girl.nickname}\`);
+                            console.log('- photos 배열:', girl.photos);
+                            
+                            if (girl.photos && girl.photos.length > 0) {
+                                const mainPhoto = girl.photos.find(photo => photo.is_main == 1);
+                                console.log('- 메인 사진 객체:', mainPhoto);
+                                
+                                if (mainPhoto) {
+                                    console.log('- 메인 사진 URL (처음 50자):', mainPhoto.photo_url.substring(0, 50));
+                                }
+                            }
+                        });
+                        
+                        // 실제 이미지 태그들 확인
+                        setTimeout(() => {
+                            const images = document.querySelectorAll('.working-girl-card img');
+                            console.log(\`페이지의 이미지 태그 수: \${images.length}\`);
+                            
+                            images.forEach((img, index) => {
+                                console.log(\`이미지 \${index + 1}:\`);
+                                console.log('- src:', img.src);
+                                console.log('- alt:', img.alt);
+                                console.log('- naturalWidth:', img.naturalWidth);
+                                console.log('- naturalHeight:', img.naturalHeight);
+                            });
+                        }, 2000);
+                    }
+                })
+                .catch(error => {
+                    console.error('직접 API 호출 실패:', error);
+                });
+        }, 3000);
+        </script>
     </body>
     </html>
   `)
@@ -314,6 +370,11 @@ app.get('/api/working-girls', async (c) => {
       photos: girl.photos ? JSON.parse(`[${girl.photos}]`) : []
     }))
 
+    // 캐시 방지 헤더 설정
+    c.header('Cache-Control', 'no-cache, no-store, must-revalidate')
+    c.header('Pragma', 'no-cache')
+    c.header('Expires', '0')
+    
     return c.json({ success: true, working_girls: workingGirls })
   } catch (error) {
     console.error('Database error:', error)
@@ -336,7 +397,7 @@ app.get('/api/working-girls/search', async (c) => {
         ) as photos
       FROM working_girls wg
       LEFT JOIN working_girl_photos wp ON wg.id = wp.working_girl_id
-      WHERE (
+      WHERE wg.is_active = true AND (
         wg.nickname LIKE ? OR
         wg.region LIKE ? OR
         wg.gender LIKE ? OR
@@ -422,8 +483,7 @@ app.post('/api/auth/working-girl/register', async (c) => {
       line_id: formData.get('line_id'),
       kakao_id: formData.get('kakao_id'),
       phone: formData.get('phone'),
-      code: formData.get('code'),
-      is_active: formData.get('is_active') === 'true'
+      code: formData.get('code')
     }
 
     // 아이디 중복 체크
@@ -439,35 +499,85 @@ app.post('/api/auth/working-girl/register', async (c) => {
     const insertResult = await env.DB.prepare(`
       INSERT INTO working_girls (
         user_id, password, nickname, age, height, weight, gender, region,
-        line_id, kakao_id, phone, code, is_active
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        line_id, kakao_id, phone, code
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       userData.user_id, userData.password, userData.nickname, userData.age,
       userData.height, userData.weight, userData.gender, userData.region,
-      userData.line_id, userData.kakao_id, userData.phone, userData.code,
-      userData.is_active
+      userData.line_id, userData.kakao_id, userData.phone, userData.code
     ).run()
 
     const workingGirlId = insertResult.meta.last_row_id
 
-    // 사진 파일 처리 (실제 파일 업로드는 R2 bucket 설정 후 구현 예정)
-    // 현재는 더미 데이터로 처리
+    // 사진 파일 처리 - Base64 인코딩으로 저장
     const photos = formData.getAll('photos')
-    if (photos && photos.length > 0) {
+    console.log('=== 회원가입 사진 업로드 디버깅 시작 ===')
+    console.log('photos 배열 길이:', photos.length)
+    console.log('photos 배열:', photos.map((p, i) => `${i}: ${p instanceof File ? `File(${p.name}, ${p.size}bytes, ${p.type})` : `Not File: ${p}`}`))
+    
+    if (photos.length > 0) {
+      console.log('사진 업로드 조건 만족, 처리 시작')
+      
+      // 새 사진 저장
+      let processedCount = 0
+      let mainPhotoUrl = null
+      
       for (let i = 0; i < Math.min(photos.length, 10); i++) {
-        const photoUrl = `/static/images/user_${workingGirlId}_${i}.jpg` // 더미 URL
-        const isMain = i === 0
-
-        await env.DB.prepare(`
-          INSERT INTO working_girl_photos (working_girl_id, photo_url, is_main, upload_order)
-          VALUES (?, ?, ?, ?)
-        `).bind(workingGirlId, photoUrl, isMain, i + 1).run()
-
-        if (isMain) {
-          await env.DB.prepare(`
-            UPDATE working_girls SET main_photo = ? WHERE id = ?
-          `).bind(photoUrl, workingGirlId).run()
+        const photo = photos[i] as File
+        console.log(`사진 ${i + 1} 처리 중: ${photo.name}, 크기: ${photo.size}bytes, 타입: ${photo.type}`)
+        
+        // 빈 파일이나 잘못된 파일 건너뛰기
+        if (!photo || !(photo instanceof File) || photo.size === 0) {
+          console.log(`사진 ${i + 1} 빈 파일이거나 잘못된 파일로 건너뜀`)
+          continue
         }
+        
+        if (photo.size > 5 * 1024 * 1024) { // 5MB 제한
+          console.log(`사진 ${i + 1} 크기 초과로 건너뜀`)
+          continue
+        }
+        
+        try {
+          // 파일을 Base64로 인코딩하여 저장
+          console.log(`사진 ${i + 1} Base64 인코딩 시작`)
+          const arrayBuffer = await photo.arrayBuffer()
+          const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)))
+          const mimeType = photo.type || 'image/jpeg'
+          const photoUrl = `data:${mimeType};base64,${base64}`
+          console.log(`사진 ${i + 1} Base64 생성 완료, 길이: ${base64.length}`)
+          
+          const isMain = i === 0
+          if (isMain) {
+            mainPhotoUrl = photoUrl
+          }
+          
+          const insertResult = await env.DB.prepare(`
+            INSERT INTO working_girl_photos (working_girl_id, photo_url, is_main, upload_order)
+            VALUES (?, ?, ?, ?)
+          `).bind(workingGirlId, photoUrl, isMain ? 1 : 0, i + 1).run()
+          console.log(`사진 ${i + 1} 데이터베이스 저장 완료:`, insertResult)
+          processedCount++
+        } catch (error) {
+          console.error(`사진 ${i + 1} 처리 오류:`, error)
+          // 에러가 발생해도 다음 사진 처리 계속
+        }
+      }
+      
+      // 메인 사진이 있으면 working_girls 테이블도 업데이트
+      if (mainPhotoUrl) {
+        await env.DB.prepare(`
+          UPDATE working_girls SET main_photo = ? WHERE id = ?
+        `).bind(mainPhotoUrl, workingGirlId).run()
+        console.log('메인 사진 업데이트 완료:', mainPhotoUrl.substring(0, 50) + '...')
+      }
+      
+      console.log(`총 ${processedCount}개 사진 처리 완료`)
+    } else {
+      console.log('사진 업로드 조건 불만족:')
+      console.log('- photos.length:', photos.length)
+      if (photos.length > 0) {
+        console.log('- photos[0] instanceof File:', photos[0] instanceof File)
+        console.log('- photos[0].size:', photos[0] instanceof File ? photos[0].size : 'N/A')
       }
     }
 
@@ -509,6 +619,252 @@ app.post('/api/auth/working-girl/login', async (c) => {
   } catch (error) {
     console.error('Login error:', error)
     return c.json({ success: false, message: '로그인에 실패했습니다.' }, 500)
+  }
+})
+
+// 워킹걸 프로필 조회 - 완전히 새로운 로직
+app.get('/api/working-girl/profile', async (c) => {
+  const { env } = c
+  const sessionToken = c.req.header('Authorization')?.replace('Bearer ', '') || 
+                      c.req.query('session_token')
+
+  console.log('=== 프로필 조회 API 시작 ===')
+  console.log('세션 토큰:', sessionToken ? '있음' : '없음')
+
+  if (!sessionToken) {
+    return c.json({ success: false, message: '인증이 필요합니다.' }, 401)
+  }
+
+  try {
+    // 세션 검증
+    const session = await env.DB.prepare(`
+      SELECT * FROM sessions 
+      WHERE session_token = ? AND user_type = 'working_girl' AND expires_at > datetime('now')
+    `).bind(sessionToken).first()
+    
+    console.log('세션 검증 결과:', session ? `사용자 ID: ${session.user_id}` : '없음')
+
+    if (!session) {
+      return c.json({ success: false, message: '유효하지 않은 세션입니다.' }, 401)
+    }
+
+    // 워킹걸 정보와 사진 정보를 한 번에 조회
+    const user = await env.DB.prepare(`
+      SELECT * FROM working_girls WHERE id = ?
+    `).bind(session.user_id).first()
+
+    const photosResult = await env.DB.prepare(`
+      SELECT id, working_girl_id, photo_url, is_main, upload_order, created_at
+      FROM working_girl_photos 
+      WHERE working_girl_id = ? 
+      ORDER BY upload_order ASC
+    `).bind(session.user_id).all()
+
+    const photos = photosResult.results || []
+    console.log(`사진 조회 결과: ${photos.length}개 발견`)
+    
+    // 사진이 있다면 첫 번째 사진 정보 로깅
+    if (photos.length > 0) {
+      console.log('첫 번째 사진 정보:', {
+        id: photos[0].id,
+        is_main: photos[0].is_main,
+        upload_order: photos[0].upload_order,
+        photo_url_length: photos[0].photo_url ? photos[0].photo_url.length : 0
+      })
+    }
+
+    const responseData = {
+      success: true,
+      id: user.id,
+      user_id: user.user_id,
+      password: user.password,
+      nickname: user.nickname,
+      age: user.age,
+      height: user.height,
+      weight: user.weight,
+      gender: user.gender,
+      region: user.region,
+      line_id: user.line_id,
+      kakao_id: user.kakao_id,
+      phone: user.phone,
+      code: user.code,
+      main_photo: user.main_photo,
+      is_active: user.is_active,
+      is_recommended: user.is_recommended,
+      created_at: user.created_at,
+      updated_at: user.updated_at,
+      photos: photos
+    }
+
+    console.log('=== 프로필 조회 API 완료 ===')
+    return c.json(responseData)
+
+  } catch (error) {
+    console.error('Profile fetch error:', error)
+    return c.json({ success: false, message: '프로필을 불러오는데 실패했습니다.' }, 500)
+  }
+})
+
+// 워킹걸 프로필 수정
+app.post('/api/working-girl/profile/update', async (c) => {
+  const { env } = c
+  const formData = await c.req.formData()
+  
+  const sessionToken = formData.get('session_token')
+  
+  if (!sessionToken) {
+    return c.json({ success: false, message: '인증이 필요합니다.' }, 401)
+  }
+
+  try {
+    // 세션 검증
+    const session = await env.DB.prepare(`
+      SELECT * FROM sessions 
+      WHERE session_token = ? AND user_type = 'working_girl' AND expires_at > datetime('now')
+    `).bind(sessionToken).first()
+
+    if (!session) {
+      return c.json({ success: false, message: '유효하지 않은 세션입니다.' }, 401)
+    }
+
+    // 업데이트할 데이터 수집
+    const updateData = {
+      is_active: formData.get('is_active') === 'true',
+      password: formData.get('password'),
+      nickname: formData.get('nickname'),
+      age: parseInt(formData.get('age')),
+      height: parseInt(formData.get('height')),
+      weight: parseInt(formData.get('weight')),
+      gender: formData.get('gender'),
+      region: formData.get('region'),
+      line_id: formData.get('line_id'),
+      kakao_id: formData.get('kakao_id'),
+      phone: formData.get('phone'),
+      code: formData.get('code')
+    }
+
+    // 워킹걸 정보 업데이트
+    await env.DB.prepare(`
+      UPDATE working_girls SET 
+        is_active = ?, password = ?, nickname = ?, age = ?, height = ?, weight = ?,
+        gender = ?, region = ?, line_id = ?, kakao_id = ?, phone = ?, code = ?,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).bind(
+      updateData.is_active, updateData.password, updateData.nickname, 
+      updateData.age, updateData.height, updateData.weight,
+      updateData.gender, updateData.region, updateData.line_id, 
+      updateData.kakao_id, updateData.phone, updateData.code,
+      session.user_id
+    ).run()
+
+    // 새로운 사진이 업로드된 경우 - 안전한 처리 로직
+    const photos = formData.getAll('photos')
+    console.log('=== 프로필 수정 사진 업로드 시작 ===')
+    console.log('photos 배열 길이:', photos.length)
+    console.log('photos 배열:', photos.map((p, i) => `${i}: ${p instanceof File ? `File(${p.name}, ${p.size}bytes, ${p.type})` : `Not File: ${p}`}`))
+    
+    // 업로드할 유효한 사진 파일들을 먼저 확인하고 처리
+    const validPhotos = []
+    let hasValidPhotos = false
+    
+    for (let i = 0; i < Math.min(photos.length, 10); i++) {
+      const photo = photos[i] as File
+      console.log(`사진 ${i + 1} 검증 중: ${photo?.name || 'unknown'}, 크기: ${photo?.size || 0}bytes`)
+      
+      // 유효한 파일인지 확인
+      if (photo && photo instanceof File && photo.size > 0 && photo.size <= 5 * 1024 * 1024) {
+        try {
+          // Base64 인코딩 먼저 수행
+          console.log(`사진 ${i + 1} Base64 인코딩 시작`)
+          const arrayBuffer = await photo.arrayBuffer()
+          const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)))
+          const mimeType = photo.type || 'image/jpeg'
+          const photoUrl = `data:${mimeType};base64,${base64}`
+          
+          validPhotos.push({
+            photoUrl,
+            isMain: i === 0,
+            uploadOrder: i + 1
+          })
+          hasValidPhotos = true
+          console.log(`사진 ${i + 1} 인코딩 성공, 길이: ${base64.length}`)
+        } catch (error) {
+          console.error(`사진 ${i + 1} 인코딩 실패:`, error)
+        }
+      } else {
+        console.log(`사진 ${i + 1} 유효하지 않음 - 건너뜀`)
+      }
+    }
+    
+    // 유효한 사진이 있을 때만 데이터베이스 업데이트
+    if (hasValidPhotos && validPhotos.length > 0) {
+      console.log(`총 ${validPhotos.length}개 유효한 사진 발견, 데이터베이스 업데이트 시작`)
+      
+      try {
+        // 1. 기존 사진 삭제
+        const deleteResult = await env.DB.prepare(`
+          DELETE FROM working_girl_photos WHERE working_girl_id = ?
+        `).bind(session.user_id).run()
+        console.log('기존 사진 삭제 결과:', deleteResult.changes, '개 삭제됨')
+        
+        // 2. 새 사진들을 순차적으로 저장
+        let mainPhotoUrl = null
+        for (let i = 0; i < validPhotos.length; i++) {
+          const validPhoto = validPhotos[i]
+          
+          const insertResult = await env.DB.prepare(`
+            INSERT INTO working_girl_photos (working_girl_id, photo_url, is_main, upload_order)
+            VALUES (?, ?, ?, ?)
+          `).bind(session.user_id, validPhoto.photoUrl, validPhoto.isMain ? 1 : 0, validPhoto.uploadOrder).run()
+          
+          console.log(`사진 ${i + 1} 저장 완료: ID ${insertResult.meta?.last_row_id}`)
+          
+          if (validPhoto.isMain) {
+            mainPhotoUrl = validPhoto.photoUrl
+          }
+        }
+        
+        // 3. 메인 사진 업데이트 (첫 번째 사진)
+        if (mainPhotoUrl) {
+          await env.DB.prepare(`
+            UPDATE working_girls SET main_photo = ? WHERE id = ?
+          `).bind(mainPhotoUrl, session.user_id).run()
+          console.log('메인 사진 업데이트 완료')
+        }
+        
+        console.log(`=== 사진 업로드 완료: 총 ${validPhotos.length}개 처리됨 ===`)
+        
+      } catch (dbError) {
+        console.error('데이터베이스 사진 저장 중 오류:', dbError)
+        // 실패 시에도 프로필 수정은 성공으로 처리 (기본 정보는 이미 저장됨)
+      }
+    } else {
+      console.log('=== 유효한 사진이 없음 - 사진 업데이트 건너뜀 ===')
+    }
+
+    // 업데이트된 사용자 정보와 사진 정보 반환
+    const updatedUser = await env.DB.prepare(`
+      SELECT * FROM working_girls WHERE id = ?
+    `).bind(session.user_id).first()
+
+    const updatedPhotos = await env.DB.prepare(`
+      SELECT * FROM working_girl_photos 
+      WHERE working_girl_id = ? 
+      ORDER BY upload_order ASC
+    `).bind(session.user_id).all()
+
+    return c.json({
+      success: true,
+      message: '프로필이 성공적으로 수정되었습니다.',
+      user: {
+        ...updatedUser,
+        photos: updatedPhotos.results || []
+      }
+    })
+  } catch (error) {
+    console.error('Profile update error:', error)
+    return c.json({ success: false, message: '프로필 수정에 실패했습니다.' }, 500)
   }
 })
 
@@ -835,6 +1191,229 @@ app.get('/admin', async (c) => {
   } catch (error) {
     console.error('Admin page error:', error)
     return c.text('Internal Server Error', 500)
+  }
+})
+
+// 완전히 새로운 메인 페이지 프로필 API - 단순하고 확실한 방식
+app.get('/api/v2/profiles', async (c) => {
+  const { env } = c
+
+  console.log('=== 메인 페이지 프로필 API 시작 ===')
+
+  try {
+    // 1단계: 모든 활성 워킹걸 조회
+    const workingGirlsResult = await env.DB.prepare(`
+      SELECT * FROM working_girls 
+      WHERE is_active = 1 
+      ORDER BY is_recommended DESC, created_at DESC
+    `).all()
+
+    const workingGirls = workingGirlsResult.results || []
+    console.log(`활성 워킹걸 ${workingGirls.length}명 조회됨`)
+
+    // 2단계: 각 워킹걸별로 사진 조회
+    const enrichedWorkingGirls = []
+    
+    for (const girl of workingGirls) {
+      const photosResult = await env.DB.prepare(`
+        SELECT id, working_girl_id, photo_url, is_main, upload_order, created_at
+        FROM working_girl_photos 
+        WHERE working_girl_id = ? 
+        ORDER BY upload_order ASC
+      `).bind(girl.id).all()
+
+      const photos = photosResult.results || []
+      
+      console.log(`워킹걸 ${girl.nickname} (ID: ${girl.id}): ${photos.length}개 사진`)
+      
+      // 사진이 있는 경우 첫 번째 사진 정보 로깅
+      if (photos.length > 0) {
+        console.log(`  - 첫 번째 사진: is_main=${photos[0].is_main}, order=${photos[0].upload_order}`)
+      }
+
+      enrichedWorkingGirls.push({
+        ...girl,
+        photos: photos
+      })
+    }
+
+    // 3단계: 강력한 캐시 방지 헤더 설정
+    c.header('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0')
+    c.header('Pragma', 'no-cache')
+    c.header('Expires', '0')
+    c.header('Last-Modified', new Date().toUTCString())
+    c.header('ETag', `v3-${Date.now()}`)
+
+    console.log('=== 메인 페이지 프로필 API 완료 ===')
+    
+    return c.json({ 
+      success: true, 
+      working_girls: enrichedWorkingGirls,
+      timestamp: new Date().toISOString(),
+      total_count: enrichedWorkingGirls.length
+    })
+    
+  } catch (error) {
+    console.error('메인 페이지 API 오류:', error)
+    return c.json({ success: false, error: '서버 오류가 발생했습니다.' }, 500)
+  }
+})
+
+// 데이터베이스 완전 정리 API (개발용)
+app.post('/api/cleanup-photos', async (c) => {
+  const { env } = c
+  
+  try {
+    // 모든 사진 데이터 삭제
+    await env.DB.prepare(`DELETE FROM working_girl_photos`).run()
+    
+    return c.json({ success: true, message: '모든 사진 데이터가 삭제되었습니다.' })
+  } catch (error) {
+    console.error('Photo cleanup error:', error)
+    return c.json({ success: false, message: '데이터 정리에 실패했습니다.' }, 500)
+  }
+})
+
+// 테스트 데이터 생성 API (개발용) 
+app.post('/api/reset-test-data', async (c) => {
+  const { env } = c
+  
+  try {
+    console.log('사진 데이터 초기화 시작...')
+    
+    // 1. 모든 사진 데이터 완전 삭제
+    const deleteResult = await env.DB.prepare(`DELETE FROM working_girl_photos`).run()
+    console.log('삭제 결과:', deleteResult)
+    console.log('삭제된 레코드 수:', deleteResult?.changes || deleteResult?.meta?.changes || 'unknown')
+    
+    // 2. 잠시 대기 (트랜잭션 완료 보장)
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    // 3. 확인: 모든 데이터가 삭제되었는지 체크 및 강제 삭제
+    let checkResult = await env.DB.prepare(`SELECT COUNT(*) as count FROM working_girl_photos`).first()
+    console.log('1차 삭제 후 남은 레코드 수:', checkResult?.count || 'unknown')
+    
+    // 데이터가 남아있으면 강제로 다시 삭제
+    if ((checkResult?.count || 0) > 0) {
+      console.log('잔여 데이터 발견, 강제 삭제 실행...')
+      await env.DB.prepare(`DELETE FROM working_girl_photos WHERE 1=1`).run()
+      await env.DB.prepare(`VACUUM`).run() // SQLite 최적화
+      
+      checkResult = await env.DB.prepare(`SELECT COUNT(*) as count FROM working_girl_photos`).first()
+      console.log('2차 삭제 후 남은 레코드 수:', checkResult?.count || 'unknown')
+    }
+    
+    // 4. 새로운 Base64 테스트 이미지 생성
+    const redImageBase64 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAAAdgAAAHYBTnsmCAAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAABjSURBVBiVpY+xDQAwCANfbmj2H5k9OqRVShURER+zXQxERMzd3d3d3d3d3d3d3d3d3d3dxcwkxfY4M3PnlvG5iZmZmRERERER+7+6agAAAP//AAAAAP//wBwbhc7+1QAAAAABJRU5ErkJggg=='
+    const blueImageBase64 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAAAdgAAAHYBTnsmCAAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAABjSURBVBiVpY+xDQAwCANfbmj2H5k9OqRVShURER+zXQxERMzd3d3d3d3d3d3d3d3d3d3dxcwkxfY4M3PnlvG5iZmZmRERERER+7+6agAAAP//AAAAAP//wA4bgQ7+1QAAAAABJRU5ErkJggg=='
+    const greenImageBase64 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAAAdgAAAHYBTnsmCAAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAABjSUlERUhERERAAAAA3d3d3d3d3d3d3d3d3d3dxcwkxfY4M3PnlvG5iZmZmRERERER+7+6agAAAP//AAAAAP//wJABgQ7+1QAAAAABJRU5ErkJggg=='
+    
+    // 5. 개별적으로 삽입하고 각각 확인
+    console.log('새 데이터 삽입 시작...')
+    
+    // 나나(id=1) 빨간색 이미지
+    const insert1 = await env.DB.prepare(`
+      INSERT INTO working_girl_photos (working_girl_id, photo_url, is_main, upload_order)
+      VALUES (1, ?, 1, 1)
+    `).bind(redImageBase64).run()
+    console.log('나나 이미지 삽입:', insert1.success)
+    
+    // 리사(id=4) 파란색 이미지  
+    const insert2 = await env.DB.prepare(`
+      INSERT INTO working_girl_photos (working_girl_id, photo_url, is_main, upload_order)
+      VALUES (4, ?, 1, 1)
+    `).bind(blueImageBase64).run()
+    console.log('리사 이미지 삽입:', insert2.success)
+    
+    // 미미(id=2) 초록색 이미지
+    const insert3 = await env.DB.prepare(`
+      INSERT INTO working_girl_photos (working_girl_id, photo_url, is_main, upload_order)
+      VALUES (2, ?, 1, 1)
+    `).bind(greenImageBase64).run()
+    console.log('미미 이미지 삽입:', insert3.success)
+    
+    // 6. 최종 확인
+    const finalCheck = await env.DB.prepare(`SELECT COUNT(*) as count FROM working_girl_photos WHERE photo_url LIKE 'data:image%'`).first()
+    console.log('새 Base64 이미지 레코드 수:', finalCheck?.count || 0)
+    
+    return c.json({ 
+      success: true, 
+      message: `Base64 테스트 데이터 ${finalCheck?.count || 0}개 생성 완료`,
+      details: {
+        deleted: deleteResult.changes,
+        inserted: finalCheck?.count || 0
+      }
+    })
+  } catch (error) {
+    console.error('Test data creation error:', error)
+    return c.json({ success: false, message: '테스트 데이터 생성에 실패했습니다.', error: error.message }, 500)
+  }
+})
+
+// 사진 데이터 확인 API (개발용)
+app.get('/api/debug/check-photos/:user_id', async (c) => {
+  const { env } = c
+  const userId = c.req.param('user_id')
+  
+  try {
+    const photos = await env.DB.prepare(`
+      SELECT id, working_girl_id, photo_url, is_main, upload_order, created_at
+      FROM working_girl_photos 
+      WHERE working_girl_id = ? 
+      ORDER BY upload_order ASC
+    `).bind(parseInt(userId)).all()
+    
+    const user = await env.DB.prepare(`
+      SELECT id, user_id, nickname, main_photo
+      FROM working_girls 
+      WHERE id = ?
+    `).bind(parseInt(userId)).first()
+    
+    return c.json({ 
+      success: true, 
+      user: user,
+      photos: photos.results || [],
+      photos_count: photos.results?.length || 0
+    })
+  } catch (error) {
+    console.error('Check photos error:', error)
+    return c.json({ success: false, message: '사진 확인 중 오류가 발생했습니다.', error: error.message }, 500)
+  }
+})
+
+// 더미 사진 정리 API (개발용)
+app.post('/api/debug/cleanup-dummy-photos', async (c) => {
+  const { env } = c
+  
+  try {
+    // 더미 URL 패턴으로 된 사진들 삭제
+    const deleteResult = await env.DB.prepare(`
+      DELETE FROM working_girl_photos 
+      WHERE photo_url LIKE '/static/images/user_%' 
+         OR photo_url LIKE '/static/photos/%'
+    `).run()
+    
+    console.log('더미 사진 삭제 결과:', deleteResult)
+    
+    // working_girls 테이블의 main_photo도 더미 URL이면 NULL로 설정
+    const updateMainPhotoResult = await env.DB.prepare(`
+      UPDATE working_girls 
+      SET main_photo = NULL 
+      WHERE main_photo LIKE '/static/images/user_%' 
+         OR main_photo LIKE '/static/photos/%'
+    `).run()
+    
+    console.log('메인 사진 정리 결과:', updateMainPhotoResult)
+    
+    return c.json({ 
+      success: true, 
+      message: `더미 사진 ${deleteResult.changes}개 삭제됨`,
+      deleted_photos: deleteResult.changes,
+      updated_main_photos: updateMainPhotoResult.changes
+    })
+  } catch (error) {
+    console.error('Cleanup error:', error)
+    return c.json({ success: false, message: '정리 중 오류가 발생했습니다.', error: error.message }, 500)
   }
 })
 

@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Base64 사진 테스트</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-8">
+    <div class="max-w-2xl mx-auto bg-white rounded-lg shadow-md p-6">
+        <h1 class="text-2xl font-bold mb-6">Base64 사진 직접 추가</h1>
+        
+        <div class="mb-6">
+            <h3 class="font-bold mb-2">샘플 이미지들 (클릭하면 자동 업로드):</h3>
+            <div class="grid grid-cols-3 gap-4">
+                <div class="text-center">
+                    <div class="w-20 h-20 bg-red-500 mx-auto mb-2 rounded cursor-pointer" 
+                         onclick="uploadSample('red', '빨간색')"></div>
+                    <p class="text-sm">빨간색</p>
+                </div>
+                <div class="text-center">
+                    <div class="w-20 h-20 bg-blue-500 mx-auto mb-2 rounded cursor-pointer" 
+                         onclick="uploadSample('blue', '파란색')"></div>
+                    <p class="text-sm">파란색</p>
+                </div>
+                <div class="text-center">
+                    <div class="w-20 h-20 bg-green-500 mx-auto mb-2 rounded cursor-pointer" 
+                         onclick="uploadSample('green', '초록색')"></div>
+                    <p class="text-sm">초록색</p>
+                </div>
+            </div>
+        </div>
+
+        <div id="result" class="mt-6 hidden">
+            <h3 class="font-bold mb-2">결과:</h3>
+            <div id="resultContent" class="p-3 bg-gray-50 rounded"></div>
+        </div>
+    </div>
+
+    <script>
+        // 샘플 Base64 이미지들 (10x10 픽셀)
+        const sampleImages = {
+            red: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAAAdgAAAHYBTnsmCAAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAABjSURBVBiVY/z//z8DJQAggBhJVQcQQIykqgMIIEZS1QEEECOp6gACiJFUdQABxEiqOoAAYiRVHUAAMZKqDiCAGElVBxBAjKSqAwggRlLVAQQQI6nqAAKIkVR1AAHESKo6AAIMAJwHAxT4Rch8AAAAAElFTkSuQmCC',
+            blue: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAAAdgAAAHYBTnsmCAAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAABjSUlERUhERAAAAACO/z//z8DJQAggBhJVQcQQIykqgMIIEZS1QEEECOp6gACiJFUdQABxEiqOoAAYiRVHUAAMZKqDiCAGElVBxBAjKSqAwggRlLVAQQQI6nqAAKIkVR1AAHESKo6AAIMAAPsFlr4xW9OQAAAAAElFTkSuQmCC',
+            green: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAAAdgAAAHYBTnsmCAAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAABjSUlERUhERAAAAACO/z//z8DJQAggBhJVQcQQIykqgMIIEZS1QEEECOp6gACiJFUdQABxEiqOoAAYiRVHUAAMZKqDiCAGElVBxBAjKSqAwggRlLVAQQQI6nqAAKIkVR1AAHESKo6AAIMADn9ERjCCbm1gAAAAAElFTkSuQmCC'
+        };
+
+        async function uploadSample(color, colorName) {
+            const result = document.getElementById('result');
+            const resultContent = document.getElementById('resultContent');
+            
+            resultContent.textContent = `${colorName} 사진 업로드 중...`;
+            result.classList.remove('hidden');
+
+            try {
+                // Base64를 Blob으로 변환
+                const base64Data = sampleImages[color].split(',')[1];
+                const byteCharacters = atob(base64Data);
+                const byteNumbers = new Array(byteCharacters.length);
+                for (let i = 0; i < byteCharacters.length; i++) {
+                    byteNumbers[i] = byteCharacters.charCodeAt(i);
+                }
+                const byteArray = new Uint8Array(byteNumbers);
+                const blob = new Blob([byteArray], {type: 'image/png'});
+                
+                // FormData로 파일 업로드
+                const formData = new FormData();
+                formData.append('user_id', 'sample' + color + Date.now());
+                formData.append('password', '1234');
+                formData.append('nickname', `${colorName}샘플`);
+                formData.append('age', '25');
+                formData.append('height', '165');
+                formData.append('weight', '50');
+                formData.append('gender', '여자');
+                formData.append('region', '방콕');
+                formData.append('line_id', 'testline');
+                formData.append('phone', '01012345678');
+                formData.append('photos', blob, `${color}-sample.png`);
+
+                const response = await fetch('/api/auth/working-girl/register', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    resultContent.innerHTML = `
+                        <div class="text-green-600">
+                            <strong>✓ ${colorName} 사진 업로드 성공!</strong><br>
+                            ${data.message}<br>
+                            <a href="/" class="text-blue-500 underline">메인 페이지에서 확인</a>
+                        </div>
+                    `;
+                } else {
+                    resultContent.innerHTML = `
+                        <div class="text-red-600">
+                            <strong>✗ 실패:</strong><br>
+                            ${data.message}
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('업로드 오류:', error);
+                resultContent.innerHTML = `
+                    <div class="text-red-600">
+                        <strong>✗ 오류:</strong><br>
+                        ${error.message}
+                    </div>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>
