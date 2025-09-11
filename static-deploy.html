@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>타이위키 (Thai Wiki) - 태국 워킹걸 정보</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              thai: {
+                red: '#ED1C24',
+                blue: '#241E7E',
+                white: '#FFFFFF'
+              }
+            }
+          }
+        }
+      }
+    </script>
+    <style>
+        /* 모바일 최적화 스타일 */
+        * {
+            font-family: 'Noto Sans KR', 'Malgun Gothic', Arial, sans-serif;
+        }
+        
+        body {
+            -webkit-tap-highlight-color: transparent;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+        
+        .working-girl-card {
+            transition: all 0.2s ease;
+            cursor: pointer;
+            touch-action: manipulation;
+        }
+        
+        .working-girl-card:active {
+            transform: scale(0.98);
+        }
+        
+        @media (hover: hover) {
+            .working-girl-card:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            }
+        }
+        
+        .recommended-badge {
+            background: linear-gradient(45deg, #FFD700, #FFA500);
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.03); }
+            100% { transform: scale(1); }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- 모바일 상단바 -->
+    <header class="bg-gradient-to-r from-thai-blue to-thai-red text-white shadow-lg sticky top-0 z-30">
+        <div class="px-3 py-2 sm:px-4 sm:py-3 flex justify-between items-center">
+            <div class="flex items-center space-x-1 sm:space-x-3">
+                <i class="fas fa-globe-asia text-lg sm:text-2xl"></i>
+                <h1 class="text-lg sm:text-2xl font-bold">타이위키</h1>
+                <span class="text-xs sm:text-sm bg-white/20 px-1 py-0.5 sm:px-2 sm:py-1 rounded hidden xs:block">Thai Wiki</span>
+            </div>
+            
+            <div id="activity-status" class="hidden items-center space-x-1 sm:space-x-2">
+                <span class="text-xs sm:text-sm hidden sm:block">활동상태:</span>
+                <button id="status-toggle" class="bg-green-500 hover:bg-green-600 px-2 py-1 sm:px-3 sm:py-1 rounded-full text-xs sm:text-sm font-medium transition-colors duration-200">
+                    ON
+                </button>
+            </div>
+            
+            <button id="menu-toggle" class="text-xl sm:text-2xl hover:text-gray-200 transition-colors duration-200 p-1">
+                <i class="fas fa-bars"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- 사이드 메뉴 -->
+    <div id="side-menu" class="fixed top-0 right-0 h-full w-4/5 max-w-sm bg-white shadow-2xl transform translate-x-full transition-transform duration-300 z-50">
+        <div class="p-4 sm:p-6">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-lg sm:text-xl font-bold text-gray-800">메뉴</h3>
+                <button id="menu-close" class="text-xl sm:text-2xl text-gray-600 hover:text-gray-800 p-1">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <nav class="space-y-3 sm:space-y-4">
+                <button onclick="showWorkingGirlLogin()" class="block w-full p-3 sm:p-4 bg-thai-red text-white rounded-lg hover:bg-red-600 transition-colors duration-200 text-center">
+                    <i class="fas fa-user mr-2"></i>워킹걸 로그인
+                </button>
+                <button onclick="showAdminLogin()" class="block w-full p-3 sm:p-4 bg-thai-blue text-white rounded-lg hover:bg-blue-700 transition-colors duration-200 text-center">
+                    <i class="fas fa-cog mr-2"></i>관리자 로그인
+                </button>
+            </nav>
+        </div>
+    </div>
+
+    <!-- 메뉴 오버레이 -->
+    <div id="menu-overlay" class="fixed inset-0 bg-black/50 hidden z-40" onclick="closeSideMenu()"></div>
+
+    <!-- 광고 배너 -->
+    <div class="bg-white shadow-sm border-b">
+        <div class="px-3 py-3 sm:px-4 sm:py-4">
+            <div id="ad-banner" class="h-20 sm:h-24 md:h-28 bg-gradient-to-r from-pink-100 to-purple-100 rounded-lg overflow-hidden relative">
+                <div class="flex items-center justify-center h-full">
+                    <p class="text-gray-600 text-xs sm:text-sm text-center px-2">
+                        <i class="fas fa-ad mr-2"></i>광고 배너 영역
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 검색 섹션 -->
+    <div class="bg-white shadow-sm">
+        <div class="px-3 py-4 sm:px-4 sm:py-6">
+            <div class="max-w-2xl mx-auto">
+                <h2 class="text-lg sm:text-xl font-bold text-gray-800 mb-3 sm:mb-4 text-center">
+                    <i class="fas fa-search mr-2 text-thai-red"></i>워킹걸 검색
+                </h2>
+                <div class="relative">
+                    <input type="text" id="search-input"
+                           placeholder="닉네임, 지역, 나이 등으로 검색하세요..."
+                           class="w-full p-3 sm:p-4 pr-10 sm:pr-12 border-2 border-gray-300 rounded-full focus:border-thai-red focus:outline-none text-sm sm:text-lg">
+                    <button onclick="searchWorkingGirls()" class="absolute right-2 top-1/2 transform -translate-y-1/2 bg-thai-red text-white p-2 rounded-full hover:bg-red-600 transition-colors duration-200">
+                        <i class="fas fa-search text-sm sm:text-base"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 워킹걸 리스트 -->
+    <div class="px-3 py-4 sm:px-4 sm:py-8">
+        <div id="working-girls-list" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 sm:gap-4 lg:gap-6">
+            <!-- 데모 워킹걸 카드들 -->
+        </div>
+        
+        <!-- 로딩 표시 -->
+        <div id="loading" class="text-center py-8 hidden">
+            <i class="fas fa-spinner fa-spin text-xl sm:text-2xl text-gray-500"></i>
+            <p class="text-gray-500 mt-2 text-sm sm:text-base">데이터를 불러오는 중...</p>
+        </div>
+    </div>
+
+    <!-- 모달 컨테이너 -->
+    <div id="modal-container"></div>
+
+    <!-- 모바일 최적화 JavaScript -->
+    <script>
+        // 테스트 데이터
+        const demoWorkingGirls = [
+            { id: 1, nickname: '나나', age: 25, gender: '여자', region: '방콕', is_recommended: true, is_active: true, main_photo: 'https://via.placeholder.com/200x150/FFB6C1/000000?text=나나' },
+            { id: 2, nickname: '미미', age: 23, gender: '레이디보이', region: '파타야', is_recommended: false, is_active: true, main_photo: 'https://via.placeholder.com/200x150/DDA0DD/000000?text=미미' },
+            { id: 3, nickname: '소피아', age: 28, gender: '트랜스젠더', region: '치앙마이', is_recommended: false, is_active: false, main_photo: 'https://via.placeholder.com/200x150/F0E68C/000000?text=소피아' },
+            { id: 4, nickname: '리사', age: 26, gender: '여자', region: '푸켓', is_recommended: true, is_active: true, main_photo: 'https://via.placeholder.com/200x150/98FB98/000000?text=리사' }
+        ];
+
+        let currentUser = null;
+        let currentUserType = null;
+
+        // 페이지 로드 시 초기화
+        document.addEventListener('DOMContentLoaded', function() {
+            setupEventListeners();
+            displayWorkingGirls(demoWorkingGirls);
+        });
+
+        function setupEventListeners() {
+            const menuToggle = document.getElementById('menu-toggle');
+            const menuClose = document.getElementById('menu-close');
+            const statusToggle = document.getElementById('status-toggle');
+            const searchInput = document.getElementById('search-input');
+
+            menuToggle.addEventListener('click', openSideMenu);
+            menuClose.addEventListener('click', closeSideMenu);
+            statusToggle.addEventListener('click', toggleActivityStatus);
+            
+            searchInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') searchWorkingGirls();
+            });
+        }
+
+        function openSideMenu() {
+            const sideMenu = document.getElementById('side-menu');
+            const menuOverlay = document.getElementById('menu-overlay');
+            
+            sideMenu.classList.remove('translate-x-full');
+            menuOverlay.classList.remove('hidden');
+        }
+
+        function closeSideMenu() {
+            const sideMenu = document.getElementById('side-menu');
+            const menuOverlay = document.getElementById('menu-overlay');
+            
+            sideMenu.classList.add('translate-x-full');
+            menuOverlay.classList.add('hidden');
+        }
+
+        function displayWorkingGirls(workingGirls) {
+            const workingGirlsList = document.getElementById('working-girls-list');
+            
+            const cardsHTML = workingGirls.map(girl => {
+                const recommendedBadge = girl.is_recommended ? 
+                    '<div class="absolute top-1 left-1 sm:top-2 sm:left-2 bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-1 py-0.5 sm:px-2 sm:py-1 rounded-full text-xs font-bold recommended-badge"><i class="fas fa-star mr-1"></i><span class="hidden sm:inline">추천</span></div>' : '';
+                
+                return `
+                    <div class="working-girl-card bg-white rounded-lg shadow-md overflow-hidden" onclick="showWorkingGirlDetail(${girl.id})">
+                        <div class="relative">
+                            <img src="${girl.main_photo}" alt="${girl.nickname}" class="w-full h-32 sm:h-40 md:h-48 object-cover">
+                            ${recommendedBadge}
+                            ${!girl.is_active ? '<div class="absolute top-1 right-1 sm:top-2 sm:right-2 bg-gray-500 text-white px-1 py-0.5 sm:px-2 sm:py-1 rounded text-xs">비활성</div>' : ''}
+                        </div>
+                        <div class="p-2 sm:p-3 md:p-4">
+                            <h3 class="font-bold text-sm sm:text-base md:text-lg text-gray-800 mb-1 sm:mb-2 truncate">${girl.nickname}</h3>
+                            <div class="space-y-0.5 sm:space-y-1 text-xs sm:text-sm text-gray-600">
+                                <p class="flex items-center">
+                                    <i class="fas fa-venus mr-1 sm:mr-2 text-pink-500 text-xs"></i>
+                                    <span class="truncate">${girl.gender}</span>
+                                </p>
+                                <p class="flex items-center">
+                                    <i class="fas fa-map-marker-alt mr-1 sm:mr-2 text-red-500 text-xs"></i>
+                                    <span class="truncate">${girl.region}</span>
+                                </p>
+                                <p class="flex items-center">
+                                    <i class="fas fa-birthday-cake mr-1 sm:mr-2 text-blue-500 text-xs"></i>
+                                    <span>${girl.age}세</span>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            workingGirlsList.innerHTML = cardsHTML;
+        }
+
+        function searchWorkingGirls() {
+            const searchInput = document.getElementById('search-input');
+            const query = searchInput.value.toLowerCase().trim();
+            
+            if (query === '') {
+                displayWorkingGirls(demoWorkingGirls);
+                return;
+            }
+
+            const filtered = demoWorkingGirls.filter(girl => 
+                girl.nickname.toLowerCase().includes(query) ||
+                girl.region.toLowerCase().includes(query) ||
+                girl.gender.toLowerCase().includes(query) ||
+                girl.age.toString().includes(query)
+            );
+
+            displayWorkingGirls(filtered);
+        }
+
+        function showWorkingGirlDetail(id) {
+            const girl = demoWorkingGirls.find(g => g.id === id);
+            if (!girl) return;
+
+            const modalHTML = `
+                <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2 sm:p-4" onclick="closeModal(event)">
+                    <div class="bg-white rounded-lg w-full max-w-2xl max-h-[95vh] overflow-y-auto" onclick="event.stopPropagation()">
+                        <div class="p-3 sm:p-4 md:p-6">
+                            <div class="flex justify-between items-center mb-3 sm:mb-4">
+                                <h2 class="text-lg sm:text-xl md:text-2xl font-bold text-gray-800">${girl.nickname}</h2>
+                                <button onclick="closeModal()" class="text-gray-600 hover:text-gray-800 text-xl sm:text-2xl p-1">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+
+                            <div class="mb-4">
+                                <img src="${girl.main_photo}" alt="${girl.nickname}" class="w-full h-48 sm:h-64 object-cover rounded-lg">
+                            </div>
+
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
+                                <div class="bg-gray-50 p-3 rounded-lg">
+                                    <label class="block text-sm font-medium text-gray-700">나이</label>
+                                    <p class="mt-1 text-lg font-semibold">${girl.age}세</p>
+                                </div>
+                                <div class="bg-gray-50 p-3 rounded-lg">
+                                    <label class="block text-sm font-medium text-gray-700">성별</label>
+                                    <p class="mt-1 text-lg font-semibold">${girl.gender}</p>
+                                </div>
+                                <div class="bg-gray-50 p-3 rounded-lg">
+                                    <label class="block text-sm font-medium text-gray-700">거주 지역</label>
+                                    <p class="mt-1 text-lg font-semibold">${girl.region}</p>
+                                </div>
+                                <div class="bg-gray-50 p-3 rounded-lg">
+                                    <label class="block text-sm font-medium text-gray-700">상태</label>
+                                    <p class="mt-1 text-lg font-semibold ${girl.is_active ? 'text-green-600' : 'text-red-600'}">
+                                        ${girl.is_active ? '활성' : '비활성'}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div class="text-center">
+                                <button onclick="requestMeeting(${girl.id})" class="w-full sm:w-auto bg-thai-red hover:bg-red-600 text-white px-6 py-3 rounded-lg text-lg font-medium transition-colors duration-200">
+                                    <i class="fas fa-heart mr-2"></i>만남 요청
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('modal-container').innerHTML = modalHTML;
+        }
+
+        function showWorkingGirlLogin() {
+            closeSideMenu();
+            alert('워킹걸 로그인 기능은 데모 버전에서는 제한됩니다.');
+        }
+
+        function showAdminLogin() {
+            closeSideMenu();
+            alert('관리자 로그인 기능은 데모 버전에서는 제한됩니다.');
+        }
+
+        function toggleActivityStatus() {
+            alert('활동상태 변경 기능은 로그인이 필요합니다.');
+        }
+
+        function requestMeeting(id) {
+            alert('만남 요청 기능은 준비 중입니다.');
+        }
+
+        function closeModal(event) {
+            if (event && event.target !== event.currentTarget) return;
+            document.getElementById('modal-container').innerHTML = '';
+        }
+    </script>
+</body>
+</html>
