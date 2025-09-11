@@ -1,1 +1,116 @@
-h1 { font-family: Arial, Helvetica, sans-serif; }
+/* 타이위키 커스텀 스타일 */
+
+* {
+    font-family: 'Noto Sans KR', 'Malgun Gothic', Arial, sans-serif;
+}
+
+/* 한국어 폰트 최적화 */
+body {
+    font-family: 'Noto Sans KR', 'Malgun Gothic', Arial, sans-serif;
+    line-height: 1.6;
+}
+
+/* 워킹걸 카드 호버 효과 */
+.working-girl-card {
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.working-girl-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+}
+
+/* 추천 워킹걸 배지 */
+.recommended-badge {
+    background: linear-gradient(45deg, #FFD700, #FFA500);
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+
+/* 광고 배너 자동 슬라이드 */
+.ad-slide {
+    animation: slideInRight 0.5s ease-in-out;
+}
+
+@keyframes slideInRight {
+    from { transform: translateX(100%); }
+    to { transform: translateX(0); }
+}
+
+/* 모달 애니메이션 */
+.modal-overlay {
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+.modal-content {
+    animation: slideInUp 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes slideInUp {
+    from { 
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to { 
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* 활동상태 토글 버튼 */
+.status-on {
+    background-color: #10B981;
+}
+
+.status-off {
+    background-color: #EF4444;
+}
+
+/* 사이드 메뉴 스크롤바 스타일 */
+#side-menu::-webkit-scrollbar {
+    width: 6px;
+}
+
+#side-menu::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+#side-menu::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 3px;
+}
+
+#side-menu::-webkit-scrollbar-thumb:hover {
+    background: #a1a1a1;
+}
+
+/* 검색 입력창 스타일 */
+#search-input:focus {
+    box-shadow: 0 0 0 3px rgba(237, 28, 36, 0.1);
+}
+
+/* 로딩 스피너 */
+.loading-spinner {
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #ED1C24;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
