@@ -163,7 +163,7 @@ function loadWorkingGirls(searchQuery = '') {
         });
 }
 
-// 워킹걸 리스트 표시
+// 워킹걸 리스트 표시 (모바일 최적화)
 function displayWorkingGirls(workingGirls) {
     const workingGirlsList = document.getElementById('working-girls-list');
     const noData = document.getElementById('no-data');
@@ -179,20 +179,30 @@ function displayWorkingGirls(workingGirls) {
     const cardsHTML = workingGirls.map(girl => {
         const mainPhoto = girl.main_photo || '/static/images/default-avatar.jpg';
         const recommendedBadge = girl.is_recommended ? 
-            '<div class="absolute top-2 left-2 bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-2 py-1 rounded-full text-xs font-bold recommended-badge"><i class="fas fa-star mr-1"></i>추천</div>' : '';
+            '<div class="absolute top-1 left-1 sm:top-2 sm:left-2 bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-1 py-0.5 sm:px-2 sm:py-1 rounded-full text-xs font-bold recommended-badge"><i class="fas fa-star mr-1"></i><span class="hidden sm:inline">추천</span></div>' : '';
         
         return `
-            <div class="working-girl-card bg-white rounded-lg shadow-md overflow-hidden" onclick="showWorkingGirlDetail(${girl.id})">
+            <div class="working-girl-card bg-white rounded-lg shadow-md overflow-hidden" onclick="showWorkingGirlDetail(${girl.id})" data-id="${girl.id}">
                 <div class="relative">
-                    <img src="${mainPhoto}" alt="${girl.nickname}" class="w-full h-48 object-cover" onerror="this.src='/static/images/default-avatar.jpg'">
+                    <img src="${mainPhoto}" alt="${girl.nickname}" class="w-full h-32 sm:h-40 md:h-48 object-cover" onerror="this.src='/static/images/default-avatar.jpg'" loading="lazy">
                     ${recommendedBadge}
-                    ${!girl.is_active ? '<div class="absolute top-2 right-2 bg-gray-500 text-white px-2 py-1 rounded text-xs">비활성</div>' : ''}
+                    ${!girl.is_active ? '<div class="absolute top-1 right-1 sm:top-2 sm:right-2 bg-gray-500 text-white px-1 py-0.5 sm:px-2 sm:py-1 rounded text-xs">비활성</div>' : ''}
                 </div>
-                <div class="p-4">
-                    <h3 class="font-bold text-lg text-gray-800 mb-2">${girl.nickname}</h3>
-                    <div class="space-y-1 text-sm text-gray-600">
-                        <p><i class="fas fa-venus mr-2 text-pink-500"></i>${girl.gender}</p>
-                        <p><i class="fas fa-map-marker-alt mr-2 text-red-500"></i>${girl.region}</p>
+                <div class="p-2 sm:p-3 md:p-4 card-content">
+                    <h3 class="font-bold text-sm sm:text-base md:text-lg text-gray-800 mb-1 sm:mb-2 truncate">${girl.nickname}</h3>
+                    <div class="space-y-0.5 sm:space-y-1 text-xs sm:text-sm text-gray-600">
+                        <p class="flex items-center">
+                            <i class="fas fa-venus mr-1 sm:mr-2 text-pink-500 text-xs"></i>
+                            <span class="truncate">${girl.gender}</span>
+                        </p>
+                        <p class="flex items-center">
+                            <i class="fas fa-map-marker-alt mr-1 sm:mr-2 text-red-500 text-xs"></i>
+                            <span class="truncate">${girl.region}</span>
+                        </p>
+                        ${girl.age ? `<p class="flex items-center">
+                            <i class="fas fa-birthday-cake mr-1 sm:mr-2 text-blue-500 text-xs"></i>
+                            <span>${girl.age}세</span>
+                        </p>` : ''}
                     </div>
                 </div>
             </div>
@@ -200,6 +210,30 @@ function displayWorkingGirls(workingGirls) {
     }).join('');
 
     workingGirlsList.innerHTML = cardsHTML;
+    
+    // 모바일 터치 이벤트 최적화
+    addTouchOptimization();
+}
+
+// 모바일 터치 이벤트 최적화
+function addTouchOptimization() {
+    const cards = document.querySelectorAll('.working-girl-card');
+    cards.forEach(card => {
+        // 터치 시작
+        card.addEventListener('touchstart', function(e) {
+            this.style.transform = 'scale(0.98)';
+        }, {passive: true});
+        
+        // 터치 종료
+        card.addEventListener('touchend', function(e) {
+            this.style.transform = '';
+        }, {passive: true});
+        
+        // 터치 취소
+        card.addEventListener('touchcancel', function(e) {
+            this.style.transform = '';
+        }, {passive: true});
+    });
 }
 
 // 워킹걸 검색
@@ -223,71 +257,80 @@ function showWorkingGirlDetail(workingGirlId) {
         });
 }
 
-// 워킹걸 상세 모달 표시
+// 워킹걸 상세 모달 표시 (모바일 최적화)
 function showWorkingGirlModal(girl) {
     const photosHTML = girl.photos && girl.photos.length > 0 ? 
-        girl.photos.map(photo => `
-            <img src="${photo.photo_url}" alt="${girl.nickname}" class="w-full h-48 object-cover rounded-lg" onerror="this.src='/static/images/default-avatar.jpg'">
+        girl.photos.map((photo, index) => `
+            <img src="${photo.photo_url}" alt="${girl.nickname} ${index + 1}" 
+                 class="w-full h-32 sm:h-40 md:h-48 object-cover rounded-lg cursor-pointer" 
+                 onerror="this.src='/static/images/default-avatar.jpg'"
+                 onclick="showPhotoModal('${photo.photo_url}', '${girl.nickname}', ${index})"
+                 loading="lazy">
         `).join('') : 
-        `<img src="/static/images/default-avatar.jpg" alt="${girl.nickname}" class="w-full h-48 object-cover rounded-lg">`;
+        `<img src="/static/images/default-avatar.jpg" alt="${girl.nickname}" class="w-full h-32 sm:h-40 md:h-48 object-cover rounded-lg">`;
 
     const modalHTML = `
-        <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 modal-overlay p-4" onclick="closeModal(event)">
-            <div class="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto modal-content" onclick="event.stopPropagation()">
-                <div class="p-6">
-                    <div class="flex justify-between items-center mb-4">
-                        <h2 class="text-2xl font-bold text-gray-800">${girl.nickname}</h2>
-                        <button onclick="closeModal()" class="text-gray-600 hover:text-gray-800 text-2xl">
+        <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 modal-overlay p-2 sm:p-4" onclick="closeModal(event)">
+            <div class="bg-white rounded-lg w-full max-w-2xl max-h-[95vh] overflow-y-auto modal-content" onclick="event.stopPropagation()">
+                <div class="p-3 sm:p-4 md:p-6">
+                    <!-- 모바일 최적화 헤더 -->
+                    <div class="flex justify-between items-center mb-3 sm:mb-4">
+                        <h2 class="text-lg sm:text-xl md:text-2xl font-bold text-gray-800 truncate pr-2">${girl.nickname}</h2>
+                        <button onclick="closeModal()" class="text-gray-600 hover:text-gray-800 text-xl sm:text-2xl p-1 min-w-[44px] min-h-[44px] flex items-center justify-center">
                             <i class="fas fa-times"></i>
                         </button>
                     </div>
 
-                    <!-- 사진들 -->
-                    <div class="grid grid-cols-2 gap-4 mb-6">
+                    <!-- 모바일 최적화 사진 그리드 -->
+                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3 md:gap-4 mb-4 sm:mb-6">
                         ${photosHTML}
                     </div>
 
-                    <!-- 기본 정보 -->
-                    <div class="grid grid-cols-2 gap-4 mb-6">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700">나이</label>
-                            <p class="mt-1 text-lg">${girl.age}세</p>
+                    <!-- 모바일 최적화 기본 정보 -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-4 sm:mb-6">
+                        <div class="bg-gray-50 p-2 sm:p-3 rounded-lg">
+                            <label class="block text-xs sm:text-sm font-medium text-gray-700">나이</label>
+                            <p class="mt-1 text-sm sm:text-base md:text-lg font-semibold">${girl.age}세</p>
                         </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700">성별</label>
-                            <p class="mt-1 text-lg">${girl.gender}</p>
+                        <div class="bg-gray-50 p-2 sm:p-3 rounded-lg">
+                            <label class="block text-xs sm:text-sm font-medium text-gray-700">성별</label>
+                            <p class="mt-1 text-sm sm:text-base md:text-lg font-semibold">${girl.gender}</p>
                         </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700">키</label>
-                            <p class="mt-1 text-lg">${girl.height}cm</p>
+                        <div class="bg-gray-50 p-2 sm:p-3 rounded-lg">
+                            <label class="block text-xs sm:text-sm font-medium text-gray-700">키</label>
+                            <p class="mt-1 text-sm sm:text-base md:text-lg font-semibold">${girl.height}cm</p>
                         </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700">몸무게</label>
-                            <p class="mt-1 text-lg">${girl.weight}kg</p>
+                        <div class="bg-gray-50 p-2 sm:p-3 rounded-lg">
+                            <label class="block text-xs sm:text-sm font-medium text-gray-700">몸무게</label>
+                            <p class="mt-1 text-sm sm:text-base md:text-lg font-semibold">${girl.weight}kg</p>
                         </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700">거주 지역</label>
-                            <p class="mt-1 text-lg">${girl.region}</p>
+                        <div class="bg-gray-50 p-2 sm:p-3 rounded-lg">
+                            <label class="block text-xs sm:text-sm font-medium text-gray-700">거주 지역</label>
+                            <p class="mt-1 text-sm sm:text-base md:text-lg font-semibold">${girl.region}</p>
                         </div>
                         ${girl.code ? `
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700">코드</label>
-                            <p class="mt-1 text-lg font-bold text-thai-red">${girl.code}</p>
+                        <div class="bg-yellow-50 p-2 sm:p-3 rounded-lg">
+                            <label class="block text-xs sm:text-sm font-medium text-gray-700">코드</label>
+                            <p class="mt-1 text-sm sm:text-base md:text-lg font-bold text-thai-red">${girl.code}</p>
                         </div>
                         ` : ''}
                     </div>
 
-                    <!-- 연락처 정보 -->
+                    <!-- 연락처 정보 (모바일 최적화) -->
                     ${girl.phone ? `
-                    <div class="mb-4">
-                        <label class="block text-sm font-medium text-gray-700">전화번호</label>
-                        <p class="mt-1 text-lg">${girl.phone}</p>
+                    <div class="mb-4 sm:mb-6 bg-blue-50 p-3 rounded-lg">
+                        <label class="block text-xs sm:text-sm font-medium text-gray-700">전화번호</label>
+                        <p class="mt-1 text-sm sm:text-base md:text-lg font-semibold">
+                            <a href="tel:${girl.phone}" class="text-blue-600 hover:text-blue-800">
+                                <i class="fas fa-phone mr-2"></i>${girl.phone}
+                            </a>
+                        </p>
                     </div>
                     ` : ''}
 
-                    <!-- 만남 요청 버튼 -->
-                    <div class="mt-6 text-center">
-                        <button onclick="requestMeeting(${girl.id})" class="bg-thai-red hover:bg-red-600 text-white px-8 py-3 rounded-lg text-lg font-medium transition-colors duration-200">
+                    <!-- 모바일 최적화 만남 요청 버튼 -->
+                    <div class="mt-4 sm:mt-6 text-center">
+                        <button onclick="requestMeeting(${girl.id})" class="w-full sm:w-auto bg-thai-red hover:bg-red-600 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-lg text-base sm:text-lg font-medium transition-colors duration-200 min-h-[48px]">
                             <i class="fas fa-heart mr-2"></i>만남 요청
                         </button>
                     </div>
@@ -297,6 +340,33 @@ function showWorkingGirlModal(girl) {
     `;
 
     document.getElementById('modal-container').innerHTML = modalHTML;
+    
+    // 모바일에서 스크롤 방지
+    document.body.style.overflow = 'hidden';
+}
+
+// 사진 확대 모달 (모바일 최적화)
+function showPhotoModal(photoUrl, nickname, index) {
+    const photoModalHTML = `
+        <div class="fixed inset-0 bg-black/90 flex items-center justify-center z-60 p-2" onclick="closePhotoModal(event)">
+            <div class="relative max-w-full max-h-full">
+                <img src="${photoUrl}" alt="${nickname}" class="max-w-full max-h-full object-contain rounded-lg" onclick="event.stopPropagation()">
+                <button onclick="closePhotoModal()" class="absolute top-2 right-2 bg-black/50 text-white p-2 rounded-full hover:bg-black/70 min-w-[44px] min-h-[44px]">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', photoModalHTML);
+}
+
+function closePhotoModal(event) {
+    if (event && event.target !== event.currentTarget) return;
+    const photoModal = document.querySelector('.fixed.inset-0.bg-black\\/90');
+    if (photoModal) {
+        photoModal.remove();
+    }
 }
 
 // 만남 요청 (준비만 해두고 나중에 링크 연결)
@@ -305,10 +375,13 @@ function requestMeeting(workingGirlId) {
     showNotification('만남 요청 기능은 준비 중입니다.', 'info');
 }
 
-// 모달 닫기
+// 모달 닫기 (모바일 최적화)
 function closeModal(event) {
     if (event && event.target !== event.currentTarget) return;
     document.getElementById('modal-container').innerHTML = '';
+    
+    // 모바일에서 스크롤 복원
+    document.body.style.overflow = 'auto';
 }
 
 // 워킹걸 로그인 모달 표시

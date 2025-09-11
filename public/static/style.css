@@ -1,41 +1,80 @@
-/* 타이위키 커스텀 스타일 */
+/* 타이위키 모바일 우선 커스텀 스타일 */
 
 * {
     font-family: 'Noto Sans KR', 'Malgun Gothic', Arial, sans-serif;
 }
 
+/* 모바일 뷰포트 높이 변수 */
+:root {
+    --vh: 1vh;
+}
+
 /* 한국어 폰트 최적화 */
 body {
     font-family: 'Noto Sans KR', 'Malgun Gothic', Arial, sans-serif;
-    line-height: 1.6;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    /* 모바일 터치 최적화 */
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
 }
 
-/* 워킹걸 카드 호버 효과 */
+/* 모바일 안전영역 대응 */
+@supports(padding: max(0px)) {
+    body {
+        padding-left: max(12px, env(safe-area-inset-left));
+        padding-right: max(12px, env(safe-area-inset-right));
+        padding-bottom: max(12px, env(safe-area-inset-bottom));
+    }
+}
+
+/* 워킹걸 카드 모바일 최적화 */
 .working-girl-card {
-    transition: all 0.3s ease;
+    transition: all 0.2s ease;
     cursor: pointer;
+    /* 모바일 터치 최적화 */
+    touch-action: manipulation;
+    -webkit-user-select: none;
+    user-select: none;
 }
 
-.working-girl-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+/* 모바일에서는 호버 효과 제거, 데스크톱에서만 적용 */
+@media (hover: hover) {
+    .working-girl-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
 }
 
-/* 추천 워킹걸 배지 */
+/* 모바일에서 터치 효과 */
+.working-girl-card:active {
+    transform: scale(0.98);
+    transition: transform 0.1s ease;
+}
+
+/* 추천 워킹걸 배지 모바일 최적화 */
 .recommended-badge {
     background: linear-gradient(45deg, #FFD700, #FFA500);
     animation: pulse 2s infinite;
+    font-size: 0.7rem;
+    padding: 0.25rem 0.5rem;
 }
 
-@keyframes pulse {
-    0% { transform: scale(1); }
-    50% { transform: scale(1.05); }
-    100% { transform: scale(1); }
+/* 모바일에서 애니메이션 성능 최적화 */
+@media (prefers-reduced-motion: no-preference) {
+    @keyframes pulse {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.03); }
+        100% { transform: scale(1); }
+    }
 }
 
-/* 광고 배너 자동 슬라이드 */
+/* 광고 배너 모바일 최적화 */
 .ad-slide {
-    animation: slideInRight 0.5s ease-in-out;
+    animation: slideInRight 0.4s ease-in-out;
 }
 
 @keyframes slideInRight {
@@ -43,13 +82,44 @@ body {
     to { transform: translateX(0); }
 }
 
-/* 모달 애니메이션 */
+/* 광고 이미지 반응형 */
+#ad-banner img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+}
+
+/* 모달 모바일 최적화 */
 .modal-overlay {
-    animation: fadeIn 0.3s ease-in-out;
+    animation: fadeIn 0.2s ease-in-out;
+    /* 모바일 스크롤 방지 */
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
 }
 
 .modal-content {
     animation: slideInUp 0.3s ease-in-out;
+    max-height: calc(100vh - 2rem);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* 모바일 모달 풀스크린 */
+@media (max-width: 640px) {
+    .modal-overlay {
+        padding: 0.5rem;
+    }
+    
+    .modal-content {
+        max-height: calc(100vh - 1rem);
+        border-radius: 0.75rem;
+    }
 }
 
 @keyframes fadeIn {
@@ -60,7 +130,7 @@ body {
 @keyframes slideInUp {
     from { 
         opacity: 0;
-        transform: translateY(30px);
+        transform: translateY(20px);
     }
     to { 
         opacity: 1;
@@ -68,18 +138,27 @@ body {
     }
 }
 
-/* 활동상태 토글 버튼 */
+/* 활동상태 토글 버튼 모바일 최적화 */
 .status-on {
     background-color: #10B981;
+    min-height: 32px;
+    min-width: 48px;
 }
 
 .status-off {
     background-color: #EF4444;
+    min-height: 32px;
+    min-width: 48px;
 }
 
-/* 사이드 메뉴 스크롤바 스타일 */
+/* 사이드 메뉴 모바일 최적화 */
+#side-menu {
+    /* 모바일 안전영역 고려 */
+    padding-top: max(1rem, env(safe-area-inset-top));
+}
+
 #side-menu::-webkit-scrollbar {
-    width: 6px;
+    width: 4px;
 }
 
 #side-menu::-webkit-scrollbar-track {
@@ -88,29 +167,136 @@ body {
 
 #side-menu::-webkit-scrollbar-thumb {
     background: #c1c1c1;
-    border-radius: 3px;
+    border-radius: 2px;
 }
 
-#side-menu::-webkit-scrollbar-thumb:hover {
-    background: #a1a1a1;
+/* 검색 입력창 모바일 최적화 */
+#search-input {
+    /* iOS에서 줌 방지 */
+    font-size: 16px;
+    transform: translateZ(0);
+    -webkit-appearance: none;
+    border-radius: 24px;
 }
 
-/* 검색 입력창 스타일 */
 #search-input:focus {
-    box-shadow: 0 0 0 3px rgba(237, 28, 36, 0.1);
+    box-shadow: 0 0 0 2px rgba(237, 28, 36, 0.2);
 }
 
-/* 로딩 스피너 */
+/* 모바일 터치 최적화 버튼 */
+button, .button, [role="button"] {
+    min-height: 44px;
+    min-width: 44px;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* 로딩 스피너 모바일 최적화 */
 .loading-spinner {
-    border: 4px solid #f3f3f3;
-    border-top: 4px solid #ED1C24;
+    border: 3px solid #f3f3f3;
+    border-top: 3px solid #ED1C24;
     border-radius: 50%;
-    width: 40px;
-    height: 40px;
+    width: 32px;
+    height: 32px;
     animation: spin 1s linear infinite;
 }
 
 @keyframes spin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
+}
+
+/* 모바일 폼 최적화 */
+input, select, textarea {
+    /* iOS에서 줌 방지 */
+    font-size: 16px;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+}
+
+/* iOS Safari 특정 스타일 */
+@supports (-webkit-touch-callout: none) {
+    input[type="text"], 
+    input[type="password"], 
+    input[type="email"], 
+    input[type="number"], 
+    input[type="tel"],
+    select, 
+    textarea {
+        border-radius: 0.5rem;
+    }
+}
+
+/* 모바일 그리드 최적화 */
+@media (max-width: 640px) {
+    .working-girls-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 0.5rem;
+    }
+    
+    .working-girl-card {
+        border-radius: 0.5rem;
+    }
+    
+    .working-girl-card img {
+        height: 120px;
+        object-fit: cover;
+    }
+    
+    .working-girl-card .card-content {
+        padding: 0.75rem 0.5rem;
+    }
+    
+    .working-girl-card h3 {
+        font-size: 0.875rem;
+        line-height: 1.2;
+    }
+    
+    .working-girl-card p {
+        font-size: 0.75rem;
+        line-height: 1.1;
+    }
+}
+
+/* 태블릿 최적화 */
+@media (min-width: 641px) and (max-width: 1024px) {
+    .working-girls-grid {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1rem;
+    }
+}
+
+/* 성능 최적화 */
+.working-girl-card img,
+#ad-banner img {
+    will-change: auto;
+    transform: translateZ(0);
+}
+
+/* 다크모드 대응 준비 */
+@media (prefers-color-scheme: dark) {
+    :root {
+        color-scheme: light; /* 현재는 라이트모드만 지원 */
+    }
+}
+
+/* 고대비 모드 대응 */
+@media (prefers-contrast: high) {
+    .working-girl-card {
+        border: 2px solid #000;
+    }
+    
+    button {
+        border: 2px solid #000;
+    }
+}
+
+/* 접근성 향상 */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
 }

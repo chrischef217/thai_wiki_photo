@@ -137,7 +137,7 @@ app.get('/', async (c) => {
     <html lang="ko">
     <head>
         <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
         <title>타이위키 (Thai Wiki) - 태국 워킹걸 정보</title>
         <script src="https://cdn.tailwindcss.com"></script>
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
@@ -158,47 +158,47 @@ app.get('/', async (c) => {
         </script>
         <link href="/static/style.css" rel="stylesheet">
     </head>
-    <body class="bg-gray-50">
-        <!-- 상단바 -->
-        <header class="bg-gradient-to-r from-thai-blue to-thai-red text-white shadow-lg">
-            <div class="container mx-auto px-4 py-3 flex justify-between items-center">
-                <!-- 사이트 로고 -->
-                <div class="flex items-center space-x-3">
-                    <i class="fas fa-globe-asia text-2xl"></i>
-                    <h1 class="text-2xl font-bold">타이위키</h1>
-                    <span class="text-sm bg-white/20 px-2 py-1 rounded">Thai Wiki</span>
+    <body class="bg-gray-50 min-h-screen">
+        <!-- 모바일 상단바 -->
+        <header class="bg-gradient-to-r from-thai-blue to-thai-red text-white shadow-lg sticky top-0 z-30">
+            <div class="px-3 py-2 sm:px-4 sm:py-3 flex justify-between items-center">
+                <!-- 모바일 최적화 로고 -->
+                <div class="flex items-center space-x-1 sm:space-x-3">
+                    <i class="fas fa-globe-asia text-lg sm:text-2xl"></i>
+                    <h1 class="text-lg sm:text-2xl font-bold">타이위키</h1>
+                    <span class="text-xs sm:text-sm bg-white/20 px-1 py-0.5 sm:px-2 sm:py-1 rounded hidden xs:block">Thai Wiki</span>
                 </div>
 
-                <!-- 활동상태 버튼 (로그인 시에만 표시) -->
-                <div id="activity-status" class="hidden items-center space-x-2">
-                    <span class="text-sm">활동상태:</span>
-                    <button id="status-toggle" class="bg-green-500 hover:bg-green-600 px-3 py-1 rounded-full text-sm font-medium transition-colors duration-200">
+                <!-- 활동상태 버튼 (모바일 최적화) -->
+                <div id="activity-status" class="hidden items-center space-x-1 sm:space-x-2">
+                    <span class="text-xs sm:text-sm hidden sm:block">활동상태:</span>
+                    <button id="status-toggle" class="bg-green-500 hover:bg-green-600 px-2 py-1 sm:px-3 sm:py-1 rounded-full text-xs sm:text-sm font-medium transition-colors duration-200">
                         ON
                     </button>
                 </div>
 
                 <!-- 햄버거 메뉴 -->
-                <button id="menu-toggle" class="text-2xl hover:text-gray-200 transition-colors duration-200">
+                <button id="menu-toggle" class="text-xl sm:text-2xl hover:text-gray-200 transition-colors duration-200 p-1">
                     <i class="fas fa-bars"></i>
                 </button>
             </div>
         </header>
 
-        <!-- 사이드 메뉴 -->
-        <div id="side-menu" class="fixed top-0 right-0 h-full w-80 bg-white shadow-2xl transform translate-x-full transition-transform duration-300 z-50">
-            <div class="p-6">
+        <!-- 모바일 최적화 사이드 메뉴 -->
+        <div id="side-menu" class="fixed top-0 right-0 h-full w-4/5 max-w-sm bg-white shadow-2xl transform translate-x-full transition-transform duration-300 z-50">
+            <div class="p-4 sm:p-6">
                 <div class="flex justify-between items-center mb-6">
-                    <h3 class="text-xl font-bold text-gray-800">메뉴</h3>
-                    <button id="menu-close" class="text-2xl text-gray-600 hover:text-gray-800">
+                    <h3 class="text-lg sm:text-xl font-bold text-gray-800">메뉴</h3>
+                    <button id="menu-close" class="text-xl sm:text-2xl text-gray-600 hover:text-gray-800 p-1">
                         <i class="fas fa-times"></i>
                     </button>
                 </div>
                 
-                <nav class="space-y-4">
-                    <a href="#" onclick="showWorkingGirlLogin()" class="block p-3 bg-thai-red text-white rounded-lg hover:bg-red-600 transition-colors duration-200">
+                <nav class="space-y-3 sm:space-y-4">
+                    <a href="#" onclick="showWorkingGirlLogin()" class="block p-3 sm:p-4 bg-thai-red text-white rounded-lg hover:bg-red-600 transition-colors duration-200 text-center">
                         <i class="fas fa-user mr-2"></i>워킹걸 로그인
                     </a>
-                    <a href="#" onclick="showAdminLogin()" class="block p-3 bg-thai-blue text-white rounded-lg hover:bg-blue-700 transition-colors duration-200">
+                    <a href="#" onclick="showAdminLogin()" class="block p-3 sm:p-4 bg-thai-blue text-white rounded-lg hover:bg-blue-700 transition-colors duration-200 text-center">
                         <i class="fas fa-cog mr-2"></i>관리자 로그인
                     </a>
                 </nav>
@@ -206,27 +206,34 @@ app.get('/', async (c) => {
         </div>
 
         <!-- 메뉴 오버레이 -->
-        <div id="menu-overlay" class="fixed inset-0 bg-black/50 hidden z-40"></div>
+        <div id="menu-overlay" class="fixed inset-0 bg-black/50 hidden z-40" onclick="closeSideMenu()"></div>
 
-        <!-- 광고 배너 -->
+        <!-- 모바일 최적화 광고 배너 -->
         <div class="bg-white shadow-sm border-b">
-            <div class="container mx-auto px-4 py-4">
-                <div id="ad-banner" class="h-24 bg-gradient-to-r from-pink-100 to-purple-100 rounded-lg overflow-hidden relative">
+            <div class="px-3 py-3 sm:px-4 sm:py-4">
+                <!-- 광고 사이즈 안내 -->
+                <div class="mb-2 text-center">
+                    <p class="text-xs text-gray-500">광고 배너 (권장사이즈: 350x120px 모바일 / 1200x120px 데스크톱)</p>
+                </div>
+                <div id="ad-banner" class="h-20 sm:h-24 md:h-28 bg-gradient-to-r from-pink-100 to-purple-100 rounded-lg overflow-hidden relative">
                     <div id="ad-slider" class="flex transition-transform duration-500 ease-in-out h-full">
                         <!-- 광고 이미지들이 동적으로 로드됩니다 -->
                         <div class="min-w-full h-full bg-gradient-to-r from-pink-200 to-purple-200 flex items-center justify-center">
-                            <p class="text-gray-600"><i class="fas fa-ad mr-2"></i>광고 배너 영역</p>
+                            <p class="text-gray-600 text-xs sm:text-sm text-center px-2">
+                                <i class="fas fa-ad mr-2"></i>광고 배너 영역<br>
+                                <span class="text-xs">모바일: 350x120px / 데스크톱: 1200x120px</span>
+                            </p>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- 검색 섹션 -->
+        <!-- 모바일 최적화 검색 섹션 -->
         <div class="bg-white shadow-sm">
-            <div class="container mx-auto px-4 py-6">
+            <div class="px-3 py-4 sm:px-4 sm:py-6">
                 <div class="max-w-2xl mx-auto">
-                    <h2 class="text-xl font-bold text-gray-800 mb-4 text-center">
+                    <h2 class="text-lg sm:text-xl font-bold text-gray-800 mb-3 sm:mb-4 text-center">
                         <i class="fas fa-search mr-2 text-thai-red"></i>워킹걸 검색
                     </h2>
                     <div class="relative">
@@ -234,37 +241,51 @@ app.get('/', async (c) => {
                             type="text" 
                             id="search-input"
                             placeholder="닉네임, 지역, 나이 등으로 검색하세요..."
-                            class="w-full p-4 pr-12 border-2 border-gray-300 rounded-full focus:border-thai-red focus:outline-none text-lg"
+                            class="w-full p-3 sm:p-4 pr-10 sm:pr-12 border-2 border-gray-300 rounded-full focus:border-thai-red focus:outline-none text-sm sm:text-lg"
                         >
                         <button onclick="searchWorkingGirls()" class="absolute right-2 top-1/2 transform -translate-y-1/2 bg-thai-red text-white p-2 rounded-full hover:bg-red-600 transition-colors duration-200">
-                            <i class="fas fa-search"></i>
+                            <i class="fas fa-search text-sm sm:text-base"></i>
                         </button>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- 워킹걸 리스트 -->
-        <div class="container mx-auto px-4 py-8">
-            <div id="working-girls-list" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        <!-- 모바일 최적화 워킹걸 리스트 -->
+        <div class="px-3 py-4 sm:px-4 sm:py-8">
+            <div id="working-girls-list" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 sm:gap-4 lg:gap-6">
                 <!-- 워킹걸 카드들이 동적으로 로드됩니다 -->
             </div>
             
             <!-- 로딩 표시 -->
             <div id="loading" class="text-center py-8">
-                <i class="fas fa-spinner fa-spin text-2xl text-gray-500"></i>
-                <p class="text-gray-500 mt-2">데이터를 불러오는 중...</p>
+                <i class="fas fa-spinner fa-spin text-xl sm:text-2xl text-gray-500"></i>
+                <p class="text-gray-500 mt-2 text-sm sm:text-base">데이터를 불러오는 중...</p>
             </div>
 
             <!-- 데이터 없음 표시 -->
             <div id="no-data" class="text-center py-8 hidden">
-                <i class="fas fa-search text-4xl text-gray-400 mb-4"></i>
-                <p class="text-gray-500 text-lg">검색 결과가 없습니다.</p>
+                <i class="fas fa-search text-2xl sm:text-4xl text-gray-400 mb-4"></i>
+                <p class="text-gray-500 text-sm sm:text-lg">검색 결과가 없습니다.</p>
             </div>
         </div>
 
-        <!-- 모달 컨테이너 -->
+        <!-- 모바일 최적화 모달 컨테이너 -->
         <div id="modal-container"></div>
+
+        <!-- 모바일 터치 최적화 스크립트 -->
+        <script>
+            // 터치 이벤트 최적화
+            document.addEventListener('touchstart', function() {}, {passive: true});
+            
+            // 모바일 뷰포트 높이 조정
+            function setVH() {
+                let vh = window.innerHeight * 0.01;
+                document.documentElement.style.setProperty('--vh', vh + 'px');
+            }
+            window.addEventListener('resize', setVH);
+            setVH();
+        </script>
 
         <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
         <script src="/static/app.js"></script>
@@ -738,22 +759,75 @@ app.get('/admin', async (c) => {
                   </div>
               </div>
 
-              <!-- 광고 관리 섹션 -->
-              <div class="bg-white rounded-lg shadow-md p-6 mt-8">
-                  <h2 class="text-xl font-bold mb-4">광고 관리</h2>
+              <!-- 모바일 최적화 광고 관리 섹션 -->
+              <div class="bg-white rounded-lg shadow-md p-3 sm:p-4 md:p-6 mt-4 sm:mt-8">
+                  <h2 class="text-lg sm:text-xl font-bold mb-3 sm:mb-4">광고 관리</h2>
                   
+                  <!-- 광고 이미지 사이즈 가이드라인 -->
+                  <div class="bg-blue-50 border-l-4 border-blue-400 p-3 sm:p-4 mb-4 sm:mb-6">
+                      <div class="flex">
+                          <div class="flex-shrink-0">
+                              <i class="fas fa-info-circle text-blue-400 text-lg"></i>
+                          </div>
+                          <div class="ml-3">
+                              <h3 class="text-sm font-medium text-blue-800">광고 이미지 사이즈 가이드라인</h3>
+                              <div class="mt-2 text-sm text-blue-700">
+                                  <ul class="list-disc list-inside space-y-1">
+                                      <li><strong>모바일 최적화:</strong> 350×120px (가로×세로)</li>
+                                      <li><strong>데스크톱 최적화:</strong> 1200×120px (가로×세로)</li>
+                                      <li><strong>권장 형식:</strong> JPG, PNG (파일크기 500KB 이하)</li>
+                                      <li><strong>비율 유지:</strong> 가로 세로 비율 10:3 (예: 1000×300px)</li>
+                                      <li><strong>텍스트:</strong> 이미지 내 텍스트는 크고 명확하게</li>
+                                  </ul>
+                              </div>
+                              <div class="mt-3">
+                                  <p class="text-xs text-blue-600">
+                                      <i class="fas fa-lightbulb mr-1"></i>
+                                      <strong>팁:</strong> 반응형 디자인을 위해 중요한 내용은 이미지 중앙에 배치하세요.
+                                  </p>
+                              </div>
+                          </div>
+                      </div>
+                  </div>
+
                   <!-- 광고 업로드 -->
-                  <div class="mb-6 p-4 border-2 border-dashed border-gray-300 rounded-lg">
-                      <input type="file" id="ad-upload" accept="image/*" class="mb-2">
-                      <button onclick="uploadAdvertisement()" 
-                              class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded">
-                          <i class="fas fa-upload mr-2"></i>광고 업로드
-                      </button>
+                  <div class="mb-4 sm:mb-6 p-3 sm:p-4 border-2 border-dashed border-gray-300 rounded-lg">
+                      <div class="text-center">
+                          <i class="fas fa-cloud-upload-alt text-3xl sm:text-4xl text-gray-400 mb-3"></i>
+                          <div class="mb-3">
+                              <label for="ad-upload" class="cursor-pointer">
+                                  <span class="text-sm sm:text-base text-gray-600">이미지를 선택하거나 드래그하여 업로드</span>
+                              </label>
+                              <input type="file" id="ad-upload" accept="image/jpeg,image/png,image/webp" class="hidden" onchange="previewAdImage(this)">
+                          </div>
+                          
+                          <!-- 이미지 미리보기 -->
+                          <div id="ad-preview" class="hidden mb-4">
+                              <img id="ad-preview-img" class="max-w-full h-20 sm:h-24 object-contain mx-auto rounded border">
+                              <p id="ad-preview-info" class="text-xs sm:text-sm text-gray-500 mt-2"></p>
+                          </div>
+
+                          <div class="flex flex-col sm:flex-row gap-2 sm:gap-4 justify-center">
+                              <button onclick="document.getElementById('ad-upload').click()" 
+                                      class="bg-blue-500 hover:bg-blue-600 text-white px-3 sm:px-4 py-2 rounded text-sm sm:text-base">
+                                  <i class="fas fa-folder-open mr-2"></i>파일 선택
+                              </button>
+                              <button onclick="uploadAdvertisement()" 
+                                      class="bg-green-500 hover:bg-green-600 text-white px-3 sm:px-4 py-2 rounded text-sm sm:text-base" disabled id="upload-btn">
+                                  <i class="fas fa-upload mr-2"></i>광고 업로드
+                              </button>
+                          </div>
+                      </div>
                   </div>
 
                   <!-- 현재 광고 리스트 -->
-                  <div id="advertisements-list">
-                      <!-- 동적으로 로드됩니다 -->
+                  <div>
+                      <h3 class="text-base sm:text-lg font-medium mb-3 text-gray-800">
+                          <i class="fas fa-list mr-2 text-gray-600"></i>현재 광고 목록
+                      </h3>
+                      <div id="advertisements-list" class="space-y-3">
+                          <!-- 동적으로 로드됩니다 -->
+                      </div>
                   </div>
               </div>
           </div>

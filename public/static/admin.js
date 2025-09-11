@@ -351,41 +351,220 @@ function loadAdvertisementsForAdmin() {
         });
 }
 
-// 광고 리스트 표시
+// 광고 리스트 표시 (모바일 최적화)
 function displayAdvertisementsList() {
     const adsList = document.getElementById('advertisements-list');
     
     if (allAdvertisements.length === 0) {
         adsList.innerHTML = `
-            <p class="text-gray-500 text-center py-4">등록된 광고가 없습니다.</p>
+            <div class="text-center py-8">
+                <i class="fas fa-images text-4xl text-gray-300 mb-3"></i>
+                <p class="text-gray-500">등록된 광고가 없습니다.</p>
+                <p class="text-sm text-gray-400 mt-1">첫 번째 광고를 업로드해보세요!</p>
+            </div>
         `;
         return;
     }
 
-    const adsHTML = allAdvertisements.map(ad => `
-        <div class="flex items-center justify-between p-4 border rounded-lg mb-4">
-            <div class="flex items-center space-x-4">
-                <img src="${ad.image_url}" alt="${ad.title || '광고'}" class="w-16 h-16 object-cover rounded" onerror="this.style.display='none'">
-                <div>
-                    <h3 class="font-medium">${ad.title || '제목 없음'}</h3>
-                    <p class="text-sm text-gray-500">순서: ${ad.display_order}</p>
-                    <p class="text-sm text-gray-500">${ad.is_active ? '활성' : '비활성'}</p>
+    const adsHTML = allAdvertisements.map((ad, index) => `
+        <div class="bg-gray-50 border rounded-lg p-3 sm:p-4 transition-all hover:shadow-md">
+            <!-- 모바일 최적화 레이아웃 -->
+            <div class="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+                <!-- 광고 이미지 및 기본 정보 -->
+                <div class="flex items-start gap-3 flex-1">
+                    <div class="flex-shrink-0">
+                        <img src="${ad.image_url}" alt="${ad.title || '광고'}" 
+                             class="w-16 h-12 sm:w-20 sm:h-15 object-cover rounded border bg-white" 
+                             onerror="this.src='data:image/svg+xml,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"80\" height=\"60\" viewBox=\"0 0 80 60\"><rect width=\"80\" height=\"60\" fill=\"%23f3f4f6\"/><text x=\"40\" y=\"35\" text-anchor=\"middle\" fill=\"%236b7280\" font-size=\"10\">이미지 없음</text></svg>'">
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <h3 class="font-medium text-sm sm:text-base text-gray-800 truncate">
+                            ${ad.title || `광고 #${index + 1}`}
+                        </h3>
+                        <div class="flex flex-wrap gap-2 mt-1 text-xs text-gray-500">
+                            <span class="bg-gray-200 px-2 py-0.5 rounded">순서: ${ad.display_order}</span>
+                            <span class="px-2 py-0.5 rounded ${ad.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}">
+                                ${ad.is_active ? '✅ 활성' : '❌ 비활성'}
+                            </span>
+                        </div>
+                        <p class="text-xs text-gray-400 mt-1">
+                            등록일: ${new Date(ad.created_at).toLocaleDateString('ko-KR')}
+                        </p>
+                    </div>
                 </div>
-            </div>
-            <div class="flex space-x-2">
-                <button onclick="toggleAdvertisement(${ad.id}, ${!ad.is_active})" 
-                        class="px-3 py-1 rounded text-sm ${ad.is_active ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-green-500 hover:bg-green-600'} text-white">
-                    ${ad.is_active ? '비활성화' : '활성화'}
-                </button>
-                <button onclick="deleteAdvertisement(${ad.id})" 
-                        class="px-3 py-1 rounded text-sm bg-red-500 hover:bg-red-600 text-white">
-                    삭제
-                </button>
+                
+                <!-- 액션 버튼들 -->
+                <div class="flex gap-2 sm:flex-col sm:gap-1">
+                    <button onclick="toggleAdvertisement(${ad.id}, ${!ad.is_active})" 
+                            class="flex-1 sm:flex-none px-3 py-1.5 rounded text-xs sm:text-sm font-medium transition-colors ${ad.is_active ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-green-500 hover:bg-green-600'} text-white min-h-[32px]">
+                        ${ad.is_active ? '비활성화' : '활성화'}
+                    </button>
+                    <button onclick="previewAdvertisement('${ad.image_url}', '${ad.title || `광고 #${index + 1}`}')" 
+                            class="flex-1 sm:flex-none px-3 py-1.5 rounded text-xs sm:text-sm font-medium bg-blue-500 hover:bg-blue-600 text-white min-h-[32px]">
+                        미리보기
+                    </button>
+                    <button onclick="deleteAdvertisement(${ad.id}, '${ad.title || `광고 #${index + 1}`}')" 
+                            class="flex-1 sm:flex-none px-3 py-1.5 rounded text-xs sm:text-sm font-medium bg-red-500 hover:bg-red-600 text-white min-h-[32px]">
+                        삭제
+                    </button>
+                </div>
             </div>
         </div>
     `).join('');
 
     adsList.innerHTML = adsHTML;
+}
+
+// 광고 미리보기 모달
+function previewAdvertisement(imageUrl, title) {
+    const previewHTML = `
+        <div class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onclick="closeAdPreview(event)">
+            <div class="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
+                <div class="p-4 sm:p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg sm:text-xl font-bold text-gray-800">${title} - 미리보기</h3>
+                        <button onclick="closeAdPreview()" class="text-gray-600 hover:text-gray-800 text-xl sm:text-2xl p-1">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    
+                    <div class="space-y-4">
+                        <!-- 모바일 버전 미리보기 -->
+                        <div>
+                            <h4 class="font-medium text-gray-700 mb-2">📱 모바일 버전 (350×120px 권장)</h4>
+                            <div class="bg-gray-100 p-3 rounded-lg">
+                                <div class="bg-white rounded-lg overflow-hidden" style="height: 80px;">
+                                    <img src="${imageUrl}" alt="${title}" class="w-full h-full object-cover">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 데스크톱 버전 미리보기 -->
+                        <div>
+                            <h4 class="font-medium text-gray-700 mb-2">🖥️ 데스크톱 버전 (1200×120px 권장)</h4>
+                            <div class="bg-gray-100 p-4 rounded-lg">
+                                <div class="bg-white rounded-lg overflow-hidden" style="height: 100px;">
+                                    <img src="${imageUrl}" alt="${title}" class="w-full h-full object-cover">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 원본 이미지 -->
+                        <div>
+                            <h4 class="font-medium text-gray-700 mb-2">🖼️ 원본 이미지</h4>
+                            <div class="bg-gray-100 p-2 rounded-lg">
+                                <img src="${imageUrl}" alt="${title}" class="w-full h-auto object-contain max-h-96 mx-auto">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', previewHTML);
+}
+
+function closeAdPreview(event) {
+    if (event && event.target !== event.currentTarget) return;
+    const preview = document.querySelector('.fixed.inset-0.bg-black\\/80');
+    if (preview) {
+        preview.remove();
+    }
+}
+
+// 광고 이미지 미리보기 및 검증
+function previewAdImage(input) {
+    const file = input.files[0];
+    const preview = document.getElementById('ad-preview');
+    const previewImg = document.getElementById('ad-preview-img');
+    const previewInfo = document.getElementById('ad-preview-info');
+    const uploadBtn = document.getElementById('upload-btn');
+
+    if (!file) {
+        preview.classList.add('hidden');
+        uploadBtn.disabled = true;
+        return;
+    }
+
+    // 파일 타입 검증
+    if (!file.type.match(/^image\/(jpeg|jpg|png|webp)$/)) {
+        showAdminNotification('지원되는 이미지 형식: JPG, PNG, WebP', 'warning');
+        input.value = '';
+        preview.classList.add('hidden');
+        uploadBtn.disabled = true;
+        return;
+    }
+
+    // 파일 크기 검증 (500KB = 512000 bytes)
+    if (file.size > 512000) {
+        showAdminNotification('파일 크기는 500KB 이하로 업로드해주세요.', 'warning');
+        input.value = '';
+        preview.classList.add('hidden');
+        uploadBtn.disabled = true;
+        return;
+    }
+
+    // 이미지 로드 및 크기 검증
+    const img = new Image();
+    img.onload = function() {
+        const width = this.naturalWidth;
+        const height = this.naturalHeight;
+        const ratio = width / height;
+
+        // 권장 비율 체크 (10:3 = 3.33, ±0.5 허용)
+        const idealRatio = 10 / 3; // 3.33
+        const isGoodRatio = Math.abs(ratio - idealRatio) <= 0.5;
+
+        // 권장 사이즈 체크
+        const isMobileOptimal = (width === 350 && height === 120);
+        const isDesktopOptimal = (width === 1200 && height === 120);
+        const isGoodSize = width >= 350 && height >= 100;
+
+        let sizeInfo = `크기: ${width}×${height}px, 비율: ${ratio.toFixed(2)}:1`;
+        let warningMsg = '';
+
+        if (isMobileOptimal) {
+            sizeInfo += ' ✅ 모바일 최적화';
+        } else if (isDesktopOptimal) {
+            sizeInfo += ' ✅ 데스크톱 최적화';
+        } else if (isGoodRatio && isGoodSize) {
+            sizeInfo += ' ✅ 권장 비율';
+        } else {
+            if (!isGoodRatio) {
+                warningMsg += '권장 비율 10:3이 아닙니다. ';
+            }
+            if (!isGoodSize) {
+                warningMsg += '최소 크기 350×100px 이상 권장. ';
+            }
+        }
+
+        // 미리보기 표시
+        previewImg.src = URL.createObjectURL(file);
+        previewInfo.innerHTML = `
+            <div class="text-left">
+                <p class="font-medium">${sizeInfo}</p>
+                <p class="text-gray-600">파일크기: ${(file.size / 1024).toFixed(1)}KB</p>
+                ${warningMsg ? `<p class="text-yellow-600 mt-1">⚠️ ${warningMsg}</p>` : ''}
+            </div>
+        `;
+        
+        preview.classList.remove('hidden');
+        uploadBtn.disabled = false;
+
+        if (warningMsg) {
+            showAdminNotification(`업로드 가능하지만 권장사항: ${warningMsg}`, 'warning');
+        }
+    };
+
+    img.onerror = function() {
+        showAdminNotification('유효하지 않은 이미지 파일입니다.', 'error');
+        input.value = '';
+        preview.classList.add('hidden');
+        uploadBtn.disabled = true;
+    };
+
+    img.src = URL.createObjectURL(file);
 }
 
 // 광고 업로드
@@ -398,6 +577,13 @@ function uploadAdvertisement() {
         return;
     }
 
+    const uploadBtn = document.getElementById('upload-btn');
+    const originalText = uploadBtn.innerHTML;
+    
+    // 업로드 상태 표시
+    uploadBtn.disabled = true;
+    uploadBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>업로드 중...';
+
     const formData = new FormData();
     formData.append('advertisement', file);
 
@@ -408,14 +594,21 @@ function uploadAdvertisement() {
     })
         .then(response => {
             if (response.data.success) {
-                fileInput.value = ''; // 파일 입력 리셋
+                // 업로드 성공 시 리셋
+                fileInput.value = '';
+                document.getElementById('ad-preview').classList.add('hidden');
+                uploadBtn.disabled = true;
+                uploadBtn.innerHTML = originalText;
+                
                 loadAdvertisementsForAdmin(); // 광고 리스트 새로고침
-                showAdminNotification('광고가 업로드되었습니다.', 'success');
+                showAdminNotification('광고가 성공적으로 업로드되었습니다!', 'success');
             }
         })
         .catch(error => {
             console.error('Advertisement upload error:', error);
-            showAdminNotification('광고 업로드에 실패했습니다.', 'error');
+            uploadBtn.disabled = false;
+            uploadBtn.innerHTML = originalText;
+            showAdminNotification('광고 업로드에 실패했습니다. 다시 시도해주세요.', 'error');
         });
 }
 
@@ -441,21 +634,31 @@ function toggleAdvertisement(adId, newStatus) {
 }
 
 // 광고 삭제
-function deleteAdvertisement(adId) {
-    if (!confirm('정말 이 광고를 삭제하시겠습니까?')) {
+function deleteAdvertisement(adId, adTitle) {
+    const title = adTitle || '이 광고';
+    
+    if (!confirm(`'${title}'를 정말 삭제하시겠습니까?\n\n삭제된 광고는 복구할 수 없습니다.`)) {
         return;
     }
+
+    // 삭제 진행 표시
+    const deleteBtn = event.target;
+    const originalText = deleteBtn.innerHTML;
+    deleteBtn.disabled = true;
+    deleteBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
 
     axios.delete(`/api/admin/advertisement/${adId}`)
         .then(response => {
             if (response.data.success) {
                 loadAdvertisementsForAdmin(); // 광고 리스트 새로고침
-                showAdminNotification('광고가 삭제되었습니다.', 'success');
+                showAdminNotification(`'${title}'가 삭제되었습니다.`, 'success');
             }
         })
         .catch(error => {
             console.error('Delete advertisement error:', error);
-            showAdminNotification('광고 삭제에 실패했습니다.', 'error');
+            deleteBtn.disabled = false;
+            deleteBtn.innerHTML = originalText;
+            showAdminNotification(`'${title}' 삭제에 실패했습니다.`, 'error');
         });
 }
 
