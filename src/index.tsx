@@ -692,20 +692,46 @@ app.post('/api/working-girl/update-profile', async (c) => {
       line_id: formData.get('line_id'),
       kakao_id: formData.get('kakao_id'),
       phone: formData.get('phone'),
-      code: formData.get('code')
+      code: formData.get('code'),
+      is_active: formData.get('is_active') === 'true'
     }
 
-    // 워킹걸 기본 정보 업데이트
-    await env.DB.prepare(`
-      UPDATE working_girls SET
-        nickname = ?, age = ?, height = ?, weight = ?, gender = ?, region = ?,
-        line_id = ?, kakao_id = ?, phone = ?, code = ?, updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `).bind(
-      userData.nickname, userData.age, userData.height, userData.weight,
-      userData.gender, userData.region, userData.line_id, userData.kakao_id,
-      userData.phone, userData.code, workingGirlId
-    ).run()
+    // 비밀번호가 제공된 경우 비밀번호도 업데이트
+    const newPassword = formData.get('password')
+    let updateQuery, updateParams
+    
+    if (newPassword && newPassword.trim() !== '') {
+      // 비밀번호 포함 업데이트
+      updateQuery = `
+        UPDATE working_girls SET
+          nickname = ?, age = ?, height = ?, weight = ?, gender = ?, region = ?,
+          line_id = ?, kakao_id = ?, phone = ?, code = ?, password = ?, is_active = ?,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `
+      updateParams = [
+        userData.nickname, userData.age, userData.height, userData.weight,
+        userData.gender, userData.region, userData.line_id, userData.kakao_id,
+        userData.phone, userData.code, newPassword, userData.is_active, workingGirlId
+      ]
+    } else {
+      // 비밀번호 제외 업데이트
+      updateQuery = `
+        UPDATE working_girls SET
+          nickname = ?, age = ?, height = ?, weight = ?, gender = ?, region = ?,
+          line_id = ?, kakao_id = ?, phone = ?, code = ?, is_active = ?,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `
+      updateParams = [
+        userData.nickname, userData.age, userData.height, userData.weight,
+        userData.gender, userData.region, userData.line_id, userData.kakao_id,
+        userData.phone, userData.code, userData.is_active, workingGirlId
+      ]
+    }
+
+    // 워킹걸 기본 정보 업데이트 실행
+    await env.DB.prepare(updateQuery).bind(...updateParams).run()
 
     // 새 사진들이 업로드된 경우에만 기존 사진들 삭제 후 처리
     const photos = formData.getAll('photos')

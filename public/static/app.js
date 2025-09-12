@@ -712,6 +712,7 @@ function showWorkingGirlEdit() {
 
 // 워킹걸 프로필 수정 모달 HTML
 function showWorkingGirlEditModal(user) {
+    console.log('프로필 수정 모달 - 사용자 데이터:', user);
     const modalHTML = `
         <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 modal-overlay p-4" onclick="closeModal(event)">
             <div class="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto modal-content" onclick="event.stopPropagation()">
@@ -747,9 +748,10 @@ function showWorkingGirlEditModal(user) {
                                        class="w-full p-3 border border-gray-300 rounded-lg bg-gray-100">
                             </div>
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">비밀번호 * (숫자만)</label>
-                                <input type="password" id="edit-password" value="${user.password}" required pattern="[0-9]+" 
+                                <label class="block text-sm font-medium text-gray-700 mb-2">새 비밀번호 (숫자만, 변경할 때만 입력)</label>
+                                <input type="password" id="edit-password" placeholder="새 비밀번호를 입력하세요 (숫자만)" pattern="[0-9]+" 
                                        class="w-full p-3 border border-gray-300 rounded-lg focus:border-thai-red focus:outline-none">
+                                <p class="text-sm text-gray-500 mt-1">비밀번호를 변경하지 않으려면 빈 칸으로 두세요.</p>
                             </div>
                         </div>
 
@@ -973,7 +975,12 @@ async function updateWorkingGirlProfile(event) {
         const formData = new FormData();
         formData.append('session_token', session_token);
         formData.append('is_active', document.querySelector('input[name="is_active"]:checked').value === 'true');
-        formData.append('password', document.getElementById('edit-password').value);
+        
+        // 비밀번호는 입력된 경우에만 전송
+        const newPassword = document.getElementById('edit-password').value;
+        if (newPassword && newPassword.trim() !== '') {
+            formData.append('password', newPassword);
+        }
         formData.append('nickname', document.getElementById('edit-nickname').value);
         formData.append('age', document.getElementById('edit-age').value);
         formData.append('height', document.getElementById('edit-height').value);
