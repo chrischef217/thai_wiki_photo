@@ -1,9 +1,9 @@
 module.exports = {
   apps: [
     {
-      name: 'thaiwiki',
+      name: 'thai-wiki-photo-test',
       script: 'npx',
-      args: 'wrangler pages dev dist --d1=thaiwiki-production --local --ip 0.0.0.0 --port 3000',
+      args: 'wrangler pages dev dist --d1=thai-wiki-production --local --ip 0.0.0.0 --port 3000',
       env: {
         NODE_ENV: 'development',
         PORT: 3000

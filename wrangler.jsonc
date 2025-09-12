@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "thaiwiki",
+  "name": "thai-wiki-photo-test",
   "compatibility_date": "2025-09-11",
   "pages_build_output_dir": "./dist",
   "compatibility_flags": [
@@ -9,14 +9,8 @@
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "thaiwiki-production",
-      "database_id": ""
-    }
-  ],
-  "r2_buckets": [
-    {
-      "binding": "BUCKET",
-      "bucket_name": "thaiwiki-files"
+      "database_name": "thai-wiki-production",
+      "database_id": "placeholder-will-be-created"
     }
   ]
 }
