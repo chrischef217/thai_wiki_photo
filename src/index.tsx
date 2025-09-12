@@ -661,8 +661,10 @@ app.post('/api/working-girl/update-profile', async (c) => {
   const { env } = c
 
   try {
+    const formData = await c.req.formData()
+    
     // 세션에서 사용자 정보 가져오기
-    const sessionToken = c.req.header('Authorization')?.replace('Bearer ', '')
+    const sessionToken = formData.get('session_token')
     
     if (!sessionToken) {
       return c.json({ success: false, message: '로그인이 필요합니다.' }, 401)
@@ -678,7 +680,6 @@ app.post('/api/working-girl/update-profile', async (c) => {
       return c.json({ success: false, message: '유효하지 않은 세션입니다.' }, 401)
     }
 
-    const formData = await c.req.formData()
     const workingGirlId = session.user_id
 
     // 기본 정보 업데이트
