@@ -753,8 +753,91 @@ function showWorkingGirlEditModal(user) {
                             </div>
                         </div>
 
-                        <!-- 나머지 필드들... (회원가입과 동일하되 기존 값이 채워진 상태) -->
-                        <!-- 생략된 부분은 회원가입 폼과 동일 -->
+                        <!-- 기본 정보 -->
+                        <div class="grid grid-cols-2 gap-4 mb-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">닉네임 *</label>
+                                <input type="text" id="edit-nickname" value="${user.nickname || ''}" required 
+                                       class="w-full p-3 border border-gray-300 rounded-lg focus:border-thai-red focus:outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">나이 *</label>
+                                <input type="number" id="edit-age" value="${user.age || ''}" required min="18" max="60" 
+                                       class="w-full p-3 border border-gray-300 rounded-lg focus:border-thai-red focus:outline-none">
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4 mb-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">키 (cm) *</label>
+                                <input type="number" id="edit-height" value="${user.height || ''}" required min="140" max="200" 
+                                       class="w-full p-3 border border-gray-300 rounded-lg focus:border-thai-red focus:outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">몸무게 (kg) *</label>
+                                <input type="number" id="edit-weight" value="${user.weight || ''}" required min="35" max="120" 
+                                       class="w-full p-3 border border-gray-300 rounded-lg focus:border-thai-red focus:outline-none">
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4 mb-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">성별 *</label>
+                                <select id="edit-gender" required 
+                                        class="w-full p-3 border border-gray-300 rounded-lg focus:border-thai-red focus:outline-none">
+                                    <option value="">선택하세요</option>
+                                    <option value="여자" ${user.gender === '여자' ? 'selected' : ''}>여자</option>
+                                    <option value="트랜스젠더" ${user.gender === '트랜스젠더' ? 'selected' : ''}>트랜스젠더</option>
+                                    <option value="레이디보이" ${user.gender === '레이디보이' ? 'selected' : ''}>레이디보이</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">거주 지역 *</label>
+                                <select id="edit-region" required 
+                                        class="w-full p-3 border border-gray-300 rounded-lg focus:border-thai-red focus:outline-none">
+                                    <option value="">선택하세요</option>
+                                    <option value="방콕" ${user.region === '방콕' ? 'selected' : ''}>방콕</option>
+                                    <option value="파타야" ${user.region === '파타야' ? 'selected' : ''}>파타야</option>
+                                    <option value="치앙마이" ${user.region === '치앙마이' ? 'selected' : ''}>치앙마이</option>
+                                    <option value="푸켓" ${user.region === '푸켓' ? 'selected' : ''}>푸켓</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- 연락처 정보 -->
+                        <div class="grid grid-cols-2 gap-4 mb-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">라인 아이디</label>
+                                <input type="text" id="edit-line-id" value="${user.line_id || ''}" 
+                                       class="w-full p-3 border border-gray-300 rounded-lg focus:border-thai-red focus:outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">카카오톡 아이디</label>
+                                <input type="text" id="edit-kakao-id" value="${user.kakao_id || ''}" 
+                                       class="w-full p-3 border border-gray-300 rounded-lg focus:border-thai-red focus:outline-none">
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4 mb-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">전화번호</label>
+                                <input type="tel" id="edit-phone" value="${user.phone || ''}" 
+                                       class="w-full p-3 border border-gray-300 rounded-lg focus:border-thai-red focus:outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">코드</label>
+                                <input type="text" id="edit-code" value="${user.code || ''}" 
+                                       class="w-full p-3 border border-gray-300 rounded-lg focus:border-thai-red focus:outline-none">
+                            </div>
+                        </div>
+
+                        <!-- 사진 업로드 -->
+                        <div class="mb-6">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">사진 업로드 (최대 10장)</label>
+                            <input type="file" id="edit-photos" multiple accept="image/*" 
+                                   class="w-full p-3 border border-gray-300 rounded-lg focus:border-thai-red focus:outline-none">
+                            <p class="text-sm text-gray-500 mt-1">새 사진을 선택하면 기존 사진을 대체합니다. 첫 번째 사진이 메인 사진으로 설정됩니다.</p>
+                        </div>
 
                         <div class="flex space-x-4">
                             <button type="submit" 
@@ -870,4 +953,78 @@ function showNotification(message, type = 'info') {
             notification.remove();
         }
     }, 5000);
+}
+
+// 워킹걸 프로필 업데이트
+async function updateWorkingGirlProfile(event) {
+    event.preventDefault();
+    
+    try {
+        // 세션 토큰 확인
+        const sessionData = localStorage.getItem('thaiwiki_session');
+        if (!sessionData) {
+            showNotification('로그인이 필요합니다.', 'error');
+            return;
+        }
+        
+        const { session_token } = JSON.parse(sessionData);
+        
+        // 폼 데이터 수집
+        const formData = new FormData();
+        formData.append('session_token', session_token);
+        formData.append('is_active', document.querySelector('input[name="is_active"]:checked').value === 'true');
+        formData.append('password', document.getElementById('edit-password').value);
+        formData.append('nickname', document.getElementById('edit-nickname').value);
+        formData.append('age', document.getElementById('edit-age').value);
+        formData.append('height', document.getElementById('edit-height').value);
+        formData.append('weight', document.getElementById('edit-weight').value);
+        formData.append('gender', document.getElementById('edit-gender').value);
+        formData.append('region', document.getElementById('edit-region').value);
+        formData.append('line_id', document.getElementById('edit-line-id').value);
+        formData.append('kakao_id', document.getElementById('edit-kakao-id').value);
+        formData.append('phone', document.getElementById('edit-phone').value);
+        formData.append('code', document.getElementById('edit-code').value);
+        
+        // 사진 파일 추가 (새로 선택된 사진이 있는 경우)
+        const photoFiles = document.getElementById('edit-photos').files;
+        if (photoFiles.length > 0) {
+            for (let i = 0; i < photoFiles.length && i < 10; i++) {
+                formData.append('photos', photoFiles[i]);
+            }
+        }
+        
+        // API 호출
+        const response = await axios.post('/api/working-girl/update-profile', formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data'
+            }
+        });
+        
+        if (response.data.success) {
+            showNotification('프로필이 성공적으로 업데이트되었습니다.', 'success');
+            
+            // 현재 사용자 정보 업데이트
+            currentUser = response.data.user;
+            
+            closeModal();
+            
+            // 활동상태 표시 업데이트
+            updateActivityStatusDisplay();
+            
+            // 프로필 목록 새로고침 (메인 페이지에 있다면)
+            if (typeof loadWorkingGirls === 'function') {
+                loadWorkingGirls();
+            }
+        } else {
+            showNotification(response.data.message || '업데이트에 실패했습니다.', 'error');
+        }
+        
+    } catch (error) {
+        console.error('Profile update error:', error);
+        if (error.response && error.response.data && error.response.data.message) {
+            showNotification(error.response.data.message, 'error');
+        } else {
+            showNotification('프로필 업데이트 중 오류가 발생했습니다.', 'error');
+        }
+    }
 }
