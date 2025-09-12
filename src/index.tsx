@@ -455,8 +455,17 @@ app.post('/api/auth/working-girl/register', async (c) => {
               continue
             }
             
-            // 임시로 더미 Base64 사용 (콜 스택 문제 해결 후 실제 구현)
-            const base64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=='
+            // Base64 변환 (Web API 사용 - 더 안전함)
+            const arrayBuffer = await photo.arrayBuffer()
+            const bytes = new Uint8Array(arrayBuffer)
+            
+            // 바이너리를 Base64로 안전하게 변환
+            let binary = '';
+            const len = bytes.byteLength;
+            for (let j = 0; j < len; j++) {
+              binary += String.fromCharCode(bytes[j]);
+            }
+            const base64 = btoa(binary)
             const photoUrl = `data:${photo.type};base64,${base64}`
             const isMain = i === 0
             
@@ -596,7 +605,7 @@ app.get('/api/working-girl/profile', async (c) => {
   const { env } = c
   
   try {
-    // 세션에서 사용자 정보 가져오기 (실제로는 세션 토큰으로 검증해야 함)
+    // 세션에서 사용자 정보 가져오기
     const sessionToken = c.req.header('Authorization')?.replace('Bearer ', '') ||
                         c.req.query('session_token')
     
@@ -652,12 +661,25 @@ app.post('/api/working-girl/update-profile', async (c) => {
   const { env } = c
 
   try {
-    const formData = await c.req.formData()
-    const workingGirlId = formData.get('working_girl_id')
+    // 세션에서 사용자 정보 가져오기
+    const sessionToken = c.req.header('Authorization')?.replace('Bearer ', '')
     
-    if (!workingGirlId) {
-      return c.json({ success: false, message: '워킹걸 ID가 필요합니다.' }, 400)
+    if (!sessionToken) {
+      return c.json({ success: false, message: '로그인이 필요합니다.' }, 401)
     }
+    
+    // 세션 검증
+    const session = await env.DB.prepare(`
+      SELECT s.user_id FROM sessions s 
+      WHERE s.session_token = ? AND s.expires_at > CURRENT_TIMESTAMP AND s.user_type = 'working_girl'
+    `).bind(sessionToken).first()
+    
+    if (!session) {
+      return c.json({ success: false, message: '유효하지 않은 세션입니다.' }, 401)
+    }
+
+    const formData = await c.req.formData()
+    const workingGirlId = session.user_id
 
     // 기본 정보 업데이트
     const userData = {
@@ -685,7 +707,7 @@ app.post('/api/working-girl/update-profile', async (c) => {
       userData.phone, userData.code, workingGirlId
     ).run()
 
-    // 기존 사진들 삭제 (새로 업로드하는 경우)
+    // 새 사진들이 업로드된 경우에만 기존 사진들 삭제 후 처리
     const photos = formData.getAll('photos')
     if (photos && photos.length > 0) {
       await env.DB.prepare(`
@@ -711,8 +733,17 @@ app.post('/api/working-girl/update-profile', async (c) => {
               continue
             }
             
-            // 임시로 더미 Base64 사용 (콜 스택 문제 해결 후 실제 구현)
-            const base64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=='
+            // Base64 변환 (Web API 사용 - 더 안전함)
+            const arrayBuffer = await photo.arrayBuffer()
+            const bytes = new Uint8Array(arrayBuffer)
+            
+            // 바이너리를 Base64로 안전하게 변환
+            let binary = '';
+            const len = bytes.byteLength;
+            for (let j = 0; j < len; j++) {
+              binary += String.fromCharCode(bytes[j]);
+            }
+            const base64 = btoa(binary)
             const photoUrl = `data:${photo.type};base64,${base64}`
             const isMain = i === 0
             
