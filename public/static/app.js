@@ -554,7 +554,13 @@ function loginWorkingGirl(event) {
     axios.post('/api/auth/working-girl/login', { user_id: userId, password })
         .then(response => {
             if (response.data.success) {
-                localStorage.setItem('thaiwiki_session', response.data.session_token);
+                // 세션 데이터를 올바른 JSON 형태로 저장
+                const sessionData = {
+                    session_token: response.data.session_token,
+                    user_type: 'working_girl'
+                };
+                localStorage.setItem('thaiwiki_session', JSON.stringify(sessionData));
+                console.log('Session saved:', sessionData);
                 currentUser = response.data.user;
                 currentUserType = 'working_girl';
                 
@@ -663,7 +669,13 @@ function loginAdmin(event) {
     axios.post('/api/auth/admin/login', { username, password })
         .then(response => {
             if (response.data.success) {
-                localStorage.setItem('thaiwiki_session', response.data.session_token);
+                // 관리자 세션 데이터 저장
+                const sessionData = {
+                    session_token: response.data.session_token,
+                    user_type: 'admin'
+                };
+                localStorage.setItem('thaiwiki_session', JSON.stringify(sessionData));
+                console.log('Admin session saved:', sessionData);
                 currentUser = response.data.user;
                 currentUserType = 'admin';
                 
@@ -690,7 +702,19 @@ function showWorkingGirlEdit() {
     }
 
     // 현재 사용자 정보를 가져와서 폼에 채우기
-    const sessionToken = localStorage.getItem('thaiwiki_session');
+    const sessionData = localStorage.getItem('thaiwiki_session');
+    let sessionToken;
+    
+    try {
+        const session = JSON.parse(sessionData);
+        sessionToken = session.session_token;
+        console.log('프로필 로드용 세션 토큰:', sessionToken);
+    } catch (e) {
+        console.error('세션 파싱 실패:', e);
+        showNotification('세션 오류. 다시 로그인해주세요.', 'error');
+        return;
+    }
+    
     axios.get('/api/working-girl/profile', {
         headers: {
             'Authorization': `Bearer ${sessionToken}`
@@ -957,81 +981,88 @@ function showNotification(message, type = 'info') {
     }, 5000);
 }
 
-// 워킹걸 프로필 업데이트
+// 워킹걸 프로필 업데이트 - 완전히 새로운 접근
 async function updateWorkingGirlProfile(event) {
     event.preventDefault();
     
+    console.log('=== 프로필 업데이트 시작 ===');
+    
     try {
-        // 세션 토큰 확인
+        // 1. 세션 확인 (간단하게)
         const sessionData = localStorage.getItem('thaiwiki_session');
         if (!sessionData) {
             showNotification('로그인이 필요합니다.', 'error');
             return;
         }
         
-        const { session_token } = JSON.parse(sessionData);
+        let sessionInfo;
+        try {
+            sessionInfo = JSON.parse(sessionData);
+        } catch (e) {
+            console.log('세션 파싱 실패, localStorage 정리 후 다시 로그인 필요');
+            localStorage.removeItem('thaiwiki_session');
+            showNotification('세션 오류. 다시 로그인해주세요.', 'error');
+            return;
+        }
         
-        // 폼 데이터 수집
-        const formData = new FormData();
-        formData.append('session_token', session_token);
-        formData.append('is_active', document.querySelector('input[name="is_active"]:checked').value === 'true');
+        console.log('세션 정보:', sessionInfo);
         
-        // 비밀번호는 입력된 경우에만 전송
+        // 2. 간단한 JSON 데이터만 사용 (일단 사진 제외)
+        const profileData = {
+            session_token: sessionInfo.session_token,
+            is_active: document.querySelector('input[name="is_active"]:checked').value === 'true',
+            nickname: document.getElementById('edit-nickname').value,
+            age: parseInt(document.getElementById('edit-age').value),
+            height: parseInt(document.getElementById('edit-height').value),
+            weight: parseInt(document.getElementById('edit-weight').value),
+            gender: document.getElementById('edit-gender').value,
+            region: document.getElementById('edit-region').value,
+            line_id: document.getElementById('edit-line-id').value || '',
+            kakao_id: document.getElementById('edit-kakao-id').value || '',
+            phone: document.getElementById('edit-phone').value || '',
+            code: document.getElementById('edit-code').value || ''
+        };
+        
+        // 비밀번호가 입력된 경우에만 포함
         const newPassword = document.getElementById('edit-password').value;
         if (newPassword && newPassword.trim() !== '') {
-            formData.append('password', newPassword);
-        }
-        formData.append('nickname', document.getElementById('edit-nickname').value);
-        formData.append('age', document.getElementById('edit-age').value);
-        formData.append('height', document.getElementById('edit-height').value);
-        formData.append('weight', document.getElementById('edit-weight').value);
-        formData.append('gender', document.getElementById('edit-gender').value);
-        formData.append('region', document.getElementById('edit-region').value);
-        formData.append('line_id', document.getElementById('edit-line-id').value);
-        formData.append('kakao_id', document.getElementById('edit-kakao-id').value);
-        formData.append('phone', document.getElementById('edit-phone').value);
-        formData.append('code', document.getElementById('edit-code').value);
-        
-        // 사진 파일 추가 (새로 선택된 사진이 있는 경우)
-        const photoFiles = document.getElementById('edit-photos').files;
-        if (photoFiles.length > 0) {
-            for (let i = 0; i < photoFiles.length && i < 10; i++) {
-                formData.append('photos', photoFiles[i]);
-            }
+            profileData.password = newPassword;
         }
         
-        // API 호출
-        const response = await axios.post('/api/working-girl/update-profile', formData, {
+        console.log('전송할 데이터:', profileData);
+        
+        // 3. 간단한 fetch 요청
+        console.log('API 요청 시작...');
+        
+        const response = await fetch('/api/working-girl/update-profile', {
+            method: 'POST',
             headers: {
-                'Content-Type': 'multipart/form-data'
-            }
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(profileData)
         });
         
-        if (response.data.success) {
-            showNotification('프로필이 성공적으로 업데이트되었습니다.', 'success');
-            
-            // 현재 사용자 정보 업데이트
-            currentUser = response.data.user;
-            
+        console.log('응답 상태:', response.status);
+        
+        const responseText = await response.text();
+        console.log('응답 텍스트:', responseText);
+        
+        const result = JSON.parse(responseText);
+        console.log('파싱된 결과:', result);
+        
+        // 4. 결과 처리
+        if (result.success) {
+            showNotification('프로필이 업데이트되었습니다!', 'success');
             closeModal();
-            
-            // 활동상태 표시 업데이트
-            updateActivityStatusDisplay();
-            
-            // 프로필 목록 새로고침 (메인 페이지에 있다면)
             if (typeof loadWorkingGirls === 'function') {
                 loadWorkingGirls();
             }
         } else {
-            showNotification(response.data.message || '업데이트에 실패했습니다.', 'error');
+            showNotification(result.message || '업데이트 실패', 'error');
         }
         
     } catch (error) {
-        console.error('Profile update error:', error);
-        if (error.response && error.response.data && error.response.data.message) {
-            showNotification(error.response.data.message, 'error');
-        } else {
-            showNotification('프로필 업데이트 중 오류가 발생했습니다.', 'error');
-        }
+        console.error('프로필 업데이트 에러:', error);
+        showNotification('프로필 업데이트 중 오류가 발생했습니다: ' + error.message, 'error');
     }
 }

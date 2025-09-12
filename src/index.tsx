@@ -661,12 +661,71 @@ app.post('/api/working-girl/update-profile', async (c) => {
   const { env } = c
 
   try {
-    const formData = await c.req.formData()
+    console.log('Profile update request received')
+    const contentType = c.req.header('content-type') || ''
+    console.log('Request Content-Type:', contentType)
     
-    // 세션에서 사용자 정보 가져오기
-    const sessionToken = formData.get('session_token')
+    let sessionToken, userData, photos = []
+    
+    if (contentType.includes('application/json')) {
+      // JSON 요청 처리
+      console.log('Processing JSON request')
+      const jsonData = await c.req.json()
+      console.log('JSON data:', jsonData)
+      
+      sessionToken = jsonData.session_token
+      userData = {
+        nickname: jsonData.nickname,
+        age: jsonData.age,
+        height: jsonData.height,
+        weight: jsonData.weight,
+        gender: jsonData.gender,
+        region: jsonData.region,
+        line_id: jsonData.line_id,
+        kakao_id: jsonData.kakao_id,
+        phone: jsonData.phone,
+        code: jsonData.code,
+        is_active: jsonData.is_active
+      }
+      
+      if (jsonData.password) {
+        userData.password = jsonData.password
+      }
+    } else {
+      // FormData 요청 처리 (사진 업로드용)
+      console.log('Processing FormData request')
+      const formData = await c.req.formData()
+      console.log('FormData keys:', Array.from(formData.keys()))
+      
+      sessionToken = formData.get('session_token')
+      userData = {
+        nickname: formData.get('nickname'),
+        age: parseInt(formData.get('age')),
+        height: parseInt(formData.get('height')),
+        weight: parseInt(formData.get('weight')),
+        gender: formData.get('gender'),
+        region: formData.get('region'),
+        line_id: formData.get('line_id'),
+        kakao_id: formData.get('kakao_id'),
+        phone: formData.get('phone'),
+        code: formData.get('code'),
+        is_active: formData.get('is_active') === 'true'
+      }
+      
+      const newPassword = formData.get('password')
+      if (newPassword && newPassword.trim() !== '') {
+        userData.password = newPassword
+      }
+      
+      // 사진 파일 처리
+      photos = formData.getAll('photos')
+    }
+    
+    console.log('Session token:', sessionToken ? 'exists' : 'missing')
+    console.log('User data:', userData)
     
     if (!sessionToken) {
+      console.log('No session token provided')
       return c.json({ success: false, message: '로그인이 필요합니다.' }, 401)
     }
     
@@ -682,23 +741,8 @@ app.post('/api/working-girl/update-profile', async (c) => {
 
     const workingGirlId = session.user_id
 
-    // 기본 정보 업데이트
-    const userData = {
-      nickname: formData.get('nickname'),
-      age: parseInt(formData.get('age')),
-      height: parseInt(formData.get('height')),
-      weight: parseInt(formData.get('weight')),
-      gender: formData.get('gender'),
-      region: formData.get('region'),
-      line_id: formData.get('line_id'),
-      kakao_id: formData.get('kakao_id'),
-      phone: formData.get('phone'),
-      code: formData.get('code'),
-      is_active: formData.get('is_active') === 'true'
-    }
-
     // 비밀번호가 제공된 경우 비밀번호도 업데이트
-    const newPassword = formData.get('password')
+    const newPassword = userData.password
     let updateQuery, updateParams
     
     if (newPassword && newPassword.trim() !== '') {
@@ -735,7 +779,6 @@ app.post('/api/working-girl/update-profile', async (c) => {
     await env.DB.prepare(updateQuery).bind(...updateParams).run()
 
     // 새 사진들이 업로드된 경우에만 기존 사진들 삭제 후 처리
-    const photos = formData.getAll('photos')
     if (photos && photos.length > 0) {
       await env.DB.prepare(`
         DELETE FROM working_girl_photos WHERE working_girl_id = ?
@@ -793,10 +836,13 @@ app.post('/api/working-girl/update-profile', async (c) => {
       }
     }
 
+    console.log('Profile update completed successfully')
     return c.json({ success: true, message: '프로필이 업데이트되었습니다.' })
   } catch (error) {
     console.error('Profile update error:', error)
-    return c.json({ success: false, message: '프로필 업데이트에 실패했습니다.' }, 500)
+    console.error('Error stack:', error.stack)
+    console.error('Error message:', error.message)
+    return c.json({ success: false, message: '프로필 업데이트에 실패했습니다.', error: error.message }, 500)
   }
 })
 
