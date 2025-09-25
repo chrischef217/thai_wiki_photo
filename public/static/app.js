@@ -233,22 +233,41 @@ function showWorkingGirlDetail(workingGirlId) {
 
 // 워킹걸 상세 모달 표시
 function showWorkingGirlModal(girl) {
-    const photosHTML = girl.photos && girl.photos.length > 0 ? 
-        girl.photos.map(photo => `
+    console.log('워킹걸 상세 데이터:', girl);
+    console.log('사진 데이터:', girl.photos);
+    
+    // 실제로 유효한 사진만 필터링
+    const validPhotos = girl.photos ? girl.photos.filter(photo => 
+        photo && photo.photo_url && photo.photo_url.trim() !== ''
+    ) : [];
+    
+    console.log('유효한 사진 개수:', validPhotos.length);
+    
+    let photosHTML = '';
+    
+    if (validPhotos.length > 0) {
+        // 실제 등록된 사진만 표시
+        photosHTML = validPhotos.map(photo => `
             <div class="aspect-square bg-gradient-to-br from-pink-200 to-purple-200 rounded-lg overflow-hidden flex items-center justify-center relative">
                 <img src="${photo.photo_url}" alt="${girl.nickname}" class="w-full h-full object-cover" 
                      onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
                      onload="this.nextElementSibling.style.display='none';">
                 <div class="absolute inset-0 flex flex-col items-center justify-center text-gray-600 font-medium" style="display: none;">
                     <i class="fas fa-camera text-3xl mb-2"></i>
-                    <div class="text-sm">사진</div>
+                    <div class="text-sm">사진 로드 실패</div>
                 </div>
             </div>
-        `).join('') : 
-        `<div class="aspect-square bg-gradient-to-br from-pink-200 to-purple-200 rounded-lg flex flex-col items-center justify-center text-gray-600 font-medium">
-            <i class="fas fa-user text-4xl mb-2"></i>
-            <div>${girl.nickname}</div>
-        </div>`;
+        `).join('');
+    } else {
+        // 등록된 사진이 없는 경우에만 기본 표시
+        photosHTML = `
+            <div class="aspect-square bg-gradient-to-br from-pink-200 to-purple-200 rounded-lg flex flex-col items-center justify-center text-gray-600 font-medium">
+                <i class="fas fa-user text-4xl mb-2"></i>
+                <div>${girl.nickname}</div>
+                <div class="text-sm mt-1">등록된 사진 없음</div>
+            </div>
+        `;
+    }
 
     const modalHTML = `
         <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 modal-overlay p-4" onclick="closeModal(event)">
@@ -262,9 +281,18 @@ function showWorkingGirlModal(girl) {
                     </div>
 
                     <!-- 사진들 -->
-                    <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+                    ${validPhotos.length > 0 ? `
+                    <div class="mb-4">
+                        <h3 class="text-lg font-semibold text-gray-800 mb-3">사진 (${validPhotos.length}장)</h3>
+                        <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+                            ${photosHTML}
+                        </div>
+                    </div>
+                    ` : `
+                    <div class="mb-6 flex justify-center">
                         ${photosHTML}
                     </div>
+                    `}
 
                     <!-- 기본 정보 -->
                     <div class="grid grid-cols-2 gap-4 mb-6">
