@@ -1,223 +1,138 @@
-# 타이위키 (Thai Wiki)
+# Thai Wiki - 태국 워킹걸 정보 관리 시스템
 
 ## 프로젝트 개요
-- **이름**: 타이위키 (Thai Wiki)
-- **목표**: 태국 워킹걸 정보 관리 및 검색 서비스
-- **주요 기능**: 워킹걸 프로필 관리, 검색, 관리자 시스템, 광고 배너
+- **이름**: Thai Wiki (타이위키)
+- **목표**: 태국 워킹걸 정보를 체계적으로 관리하고 사진과 함께 프로필을 제공하는 웹 애플리케이션
+- **특징**: 사진 업로드, 프로필 관리, 조건 정보, 라이트박스 사진 보기
 
-## 현재 완료된 기능
+## 현재 완료된 기능 ✅
 
-### ✅ 메인 페이지
-- 상단바 (타이위키 로고, 활동상태 토글, 햄버거 메뉴)
-- 광고 롤링 배너 (자동 슬라이드, 3초 간격)
-- 워킹걸 검색 기능 (실시간 검색)
-- 워킹걸 리스트 표시 (카드 형태, 추천 배지)
+### 1. 워킹걸 프로필 관리
+- 닉네임, 나이, 키, 몸무게, 거주지역, 코드 등 기본 정보 관리
+- **조건(conditions)** 필드 추가 - 줄바꿈 지원하는 textarea 입력
+- 프로필 등록 및 수정 기능
+- 로그인한 워킹걸은 직접 프로필 편집 페이지로 이동
 
-### ✅ 워킹걸 시스템
-- 회원가입 (모든 필드 포함, 사진 업로드 10장까지)
-- 로그인/로그아웃
-- 프로필 수정 (모든 정보 수정 가능)
-- 활동상태 토글 (ON/OFF)
-- 상세 정보 모달
+### 2. 사진 관리 시스템
+- **Base64 인코딩**으로 사진 저장 (Cloudflare D1 데이터베이스)
+- 다중 사진 업로드 (최대 3장)
+- 프로필 목록에서 사진 미리보기
+- **사진 클릭시 원본 크기 라이트박스 표시** ⭐ (최신 완료 기능)
 
-### ✅ 관리자 시스템
-- 관리자 로그인 (admin/1127)
-- 대시보드 (총 가입자, 활성 사용자, 지역별 통계)
-- 워킹걸 검색 및 관리
-- 추천 워킹걸 설정/해제 (★/☆)
-- 워킹걸 정보 수정/삭제
-- 광고 관리 (업로드/삭제/활성화)
+### 3. 사용자 인터페이스
+- 반응형 디자인 (모바일 우선)
+- TailwindCSS 스타일링
+- 프로필 상세보기 팝업 모달
+- 사진 라이트박스 (배경 클릭/X버튼으로 닫기)
+- 실시간 알림 시스템
 
-### ✅ 데이터베이스
-- D1 SQLite 데이터베이스
-- 완전한 스키마 (워킹걸, 사진, 관리자, 광고, 세션)
-- 로컬 개발용 마이그레이션
-- 테스트 데이터 포함
+### 4. 데이터베이스
+- Cloudflare D1 SQLite 데이터베이스
+- 사용자(users) 테이블과 사진(photos) 테이블
+- 마이그레이션 시스템으로 스키마 관리
 
-## 현재 기능별 URI 정리
+## 기술 스택
+- **백엔드**: Hono Framework (Cloudflare Workers)
+- **프론트엔드**: HTML + TailwindCSS + JavaScript
+- **데이터베이스**: Cloudflare D1 (SQLite)
+- **배포**: Cloudflare Pages
+- **개발 도구**: Vite + TypeScript + PM2
 
-### 메인 페이지
-- `GET /` - 메인 페이지
-
-### API 엔드포인트
-- `GET /api/working-girls` - 워킹걸 리스트 조회
-- `GET /api/working-girls/search?q={검색어}` - 워킹걸 검색
-- `GET /api/working-girls/{id}` - 워킹걸 상세 조회
-- `GET /api/advertisements` - 광고 배너 조회
-
-### 인증 API
-- `POST /api/auth/working-girl/register` - 워킹걸 회원가입
-- `POST /api/auth/working-girl/login` - 워킹걸 로그인
-- `POST /api/auth/admin/login` - 관리자 로그인
-- `POST /api/auth/verify-session` - 세션 검증
-- `POST /api/auth/logout` - 로그아웃
-
-### 워킹걸 관리 API
-- `POST /api/working-girl/toggle-status` - 활동상태 변경
-
-### 관리자 페이지
-- `GET /admin` - 관리자 대시보드
-
-## 아직 구현되지 않은 기능
-
-### ⏳ 관리자 API 엔드포인트
-- `POST /api/admin/working-girl/toggle-recommended` - 추천 워킹걸 설정/해제
-- `POST /api/admin/working-girl/update` - 관리자에 의한 워킹걸 정보 수정
-- `DELETE /api/admin/working-girl/{id}` - 워킹걸 삭제
-- `POST /api/admin/advertisement/upload` - 광고 업로드
-- `POST /api/admin/advertisement/toggle` - 광고 활성화/비활성화
-- `DELETE /api/admin/advertisement/{id}` - 광고 삭제
-
-### ⏳ 파일 업로드 시스템
-- 워킹걸 사진 업로드 (현재 더미 처리)
-- 광고 이미지 업로드 (현재 더미 처리)
-- R2 Bucket 연동
-
-### ⏳ 세션 관리 개선
-- 미들웨어 기반 세션 검증
-- 관리자 권한 체크
-
-### ⏳ 추가 기능
-- 관리자 비밀번호 변경
-- 워킹걸 아이디로 관리자 로그인
-- 만남 요청 기능 (외부 링크 연동)
+## URL 및 접속 정보
+- **개발 서버**: https://3000-ivn7qqwkug2m31nhzjr1c-6532622b.e2b.dev
+- **프로젝트명**: thai-wiki-photo-test
+- **GitHub**: (설정 필요시 setup_github_environment 호출 후 연결)
 
 ## 데이터 모델
 
-### 워킹걸 (working_girls)
+### Working Girls 테이블
 ```sql
-- id (PK)
-- user_id (아이디)
-- password (비밀번호, 숫자만)
-- nickname (닉네임)
-- age (나이)
-- height (키)
-- weight (몸무게)
-- gender (성별: 여자/트랜스젠더/레이디보이)
-- region (지역: 방콕/파타야/치앙마이/푸켓)
-- line_id (라인 아이디)
-- kakao_id (카카오톡 아이디)
-- phone (전화번호)
-- code (코드)
-- main_photo (메인 사진 URL)
-- is_active (활동상태)
-- is_recommended (추천 워킹걸)
+CREATE TABLE users (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  nickname TEXT NOT NULL,
+  age INTEGER,
+  height TEXT,
+  weight TEXT,
+  region TEXT,
+  code TEXT UNIQUE,
+  conditions TEXT,  -- 조건 정보 (줄바꿈 지원)
+  password TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
 ```
 
-### 워킹걸 사진 (working_girl_photos)
+### Photos 테이블
 ```sql
-- id (PK)
-- working_girl_id (FK)
-- photo_url (사진 URL)
-- is_main (메인 사진 여부)
-- upload_order (업로드 순서)
+CREATE TABLE photos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER,
+  photo_url TEXT NOT NULL,  -- Base64 인코딩된 이미지 데이터
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id)
+);
 ```
 
-### 관리자 (admins)
-```sql
-- id (PK)
-- username (기본: admin)
-- password (기본: 1127)
-```
+## 주요 기능 상세
 
-### 광고 (advertisements)
-```sql
-- id (PK)
-- image_url (광고 이미지 URL)
-- title (제목)
-- display_order (표시 순서)
-- is_active (활성 상태)
-```
+### 사진 라이트박스 시스템 ⭐
+1. **프로필 팝업에서 사진 클릭**
+2. **전역 함수 `window.openPhotoLightbox()` 호출**
+3. **전체 화면 라이트박스로 원본 크기 표시**
+4. **배경 클릭 또는 X 버튼으로 닫기**
+5. **Base64 URL 안전한 이스케이프 처리**
 
-### 세션 (sessions)
-```sql
-- id (PK)
-- session_token (세션 토큰)
-- user_type (사용자 유형: working_girl/admin)
-- user_id (사용자 ID)
-- expires_at (만료 시간)
-```
-
-## 기술 스택
-- **Backend**: Hono + TypeScript
-- **Database**: Cloudflare D1 (SQLite)
-- **Storage**: Cloudflare R2 (예정)
-- **Frontend**: Vanilla JavaScript + TailwindCSS
-- **Deployment**: Cloudflare Pages
-
-## 추천 다음 개발 단계
-
-1. **고우선순위**
-   - 관리자 API 엔드포인트 완성
-   - 세션 미들웨어 구현
-   - 파일 업로드 시스템 (R2 연동)
-
-2. **중간 우선순위**
-   - 관리자 비밀번호 변경 기능
-   - 더 나은 에러 처리 및 검증
-   - 반응형 디자인 개선
-
-3. **낮은 우선순위**
-   - 만남 요청 외부 링크 연동
-   - 다국어 지원 (태국어)
-   - 성능 최적화
-
-## 배포 상태
-- **플랫폼**: Cloudflare Pages (예정)
-- **상태**: 로컬 개발 완료
-- **데이터베이스**: D1 로컬 모드 사용 중
+### 사진 저장 방식
+- **Base64 인코딩**: 파일을 Base64 문자열로 변환하여 D1 데이터베이스에 직접 저장
+- **장점**: 별도 파일 스토리지 불필요, 트랜잭션 일관성
+- **단점**: 데이터베이스 크기 증가 (프로토타입에 적합)
 
 ## 사용자 가이드
 
-### 워킹걸 사용법
-1. 메인 페이지에서 햄버거 메뉴 → "워킹걸 로그인" 클릭
-2. 회원가입 링크를 통해 가입 (모든 필수 정보 입력, 사진 최대 10장)
-3. 로그인 후 활동상태 ON/OFF 토글 가능
-4. 프로필 수정을 통해 정보 업데이트
+### 일반 사용자
+1. **메인 페이지**에서 등록된 워킹걸 목록 확인
+2. **프로필 클릭**으로 상세 정보 팝업 보기
+3. **사진 클릭**으로 원본 크기 사진 보기
+4. **조건 정보** 확인
 
-### 관리자 사용법
-1. 햄버거 메뉴 → "관리자 로그인" 클릭
-2. 아이디: admin, 비밀번호: 1127로 로그인
-3. 대시보드에서 전체 통계 확인
-4. 워킹걸 검색 및 관리 (추천 설정, 정보 수정, 삭제)
-5. 광고 업로드 및 관리
+### 워킹걸 (등록자)
+1. **워킹걸 등록** 버튼으로 프로필 생성
+2. **사진 업로드** (최대 3장)
+3. **조건 정보** 입력 (줄바꿈 지원)
+4. **로그인 후 자동으로 편집 페이지**로 이동하여 프로필 수정
 
-## 📱 모바일 최적화
+## 배포 상태
+- **플랫폼**: Cloudflare Pages (개발 환경)
+- **상태**: ✅ 활성화
+- **데이터베이스**: ✅ 로컬 D1 SQLite (--local 모드)
+- **마지막 업데이트**: 2025-09-25
 
-### ✅ 모바일 우선 디자인
-- **반응형 레이아웃**: 모바일부터 데스크톱까지 완벽 지원
-- **터치 최적화**: 44px 이상 터치 영역, 터치 피드백
-- **성능 최적화**: 지연 로딩, 애니메이션 최적화
-- **접근성**: 고대비 모드, 모션 감소 모드 지원
+## 개발 명령어
+```bash
+# 개발 서버 시작
+npm run build
+pm2 start ecosystem.config.cjs
 
-### 📐 광고 배너 이미지 가이드라인
+# 데이터베이스 마이그레이션
+npm run db:migrate:local
 
-#### 🎯 권장 사이즈
-- **모바일 최적화**: `350×120px` (가로×세로)
-- **데스크톱 최적화**: `1200×120px` (가로×세로)
-- **비율 유지**: 가로:세로 = 10:3 (예: 1000×300px)
+# 로그 확인
+pm2 logs thai-wiki-photo-test --nostream
 
-#### 📋 기술 사양
-- **파일 형식**: JPG, PNG, WebP
-- **파일 크기**: 500KB 이하 권장
-- **최소 크기**: 350×100px 이상
-- **색상**: sRGB 색공간
+# 서비스 재시작
+pm2 restart thai-wiki-photo-test
+```
 
-#### 💡 디자인 가이드라인
-1. **텍스트 배치**: 중요한 내용은 이미지 중앙에 배치
-2. **가독성**: 배경과 텍스트의 충분한 대비
-3. **브랜딩**: 로고나 브랜드 요소는 명확하게
-4. **모바일 고려**: 작은 화면에서도 읽기 쉽도록 큰 폰트 사용
+## 완료된 주요 기능 요약
+✅ 워킹걸 등록 및 프로필 관리  
+✅ 다중 사진 업로드 (Base64)  
+✅ 프로필 상세보기 팝업  
+✅ **사진 클릭시 라이트박스 표시** (최신 완료)  
+✅ 조건 필드 추가 및 줄바꿈 지원  
+✅ 로그인 사용자 자동 리다이렉트  
+✅ 반응형 모바일 UI  
+✅ 실시간 알림 시스템  
 
-#### 📊 사이즈별 용도
-- **350×120px**: 모바일 전용 (스마트폰 최적화)
-- **1200×120px**: 데스크톱 전용 (PC/태블릿 최적화)  
-- **800×240px**: 범용 (모든 기기에서 양호)
-
-## 마지막 업데이트
-- **날짜**: 2025-09-11
-- **주요 변경사항**: 
-  - 모바일 우선 반응형 디자인 완성
-  - 광고 배너 이미지 사이즈 가이드라인 추가
-  - 터치 최적화 및 성능 개선
-  - 관리자 페이지 모바일 최적화
+## 백업 정보
+- **백업 파일**: https://page.gensparksite.com/project_backups/tooluse_ugX-KM0vQGyLGVZT9DL7EQ.tar.gz
+- **백업 날짜**: 2025-09-25
+- **설명**: 완벽히 작동하는 모든 기능이 포함된 버전

@@ -32,9 +32,9 @@ function setupEventListeners() {
     menuClose.addEventListener('click', closeSideMenu);
     menuOverlay.addEventListener('click', closeSideMenu);
 
-    // 활동상태 토글
-    const statusToggle = document.getElementById('status-toggle');
-    statusToggle.addEventListener('click', toggleActivityStatus);
+    // 활동상태 토글 (삭제됨)
+    // const statusToggle = document.getElementById('status-toggle');
+    // statusToggle.addEventListener('click', toggleActivityStatus);
 
     // 검색
     const searchInput = document.getElementById('search-input');
@@ -236,9 +236,10 @@ function showWorkingGirlModal(girl) {
     console.log('워킹걸 상세 데이터:', girl);
     console.log('사진 데이터:', girl.photos);
     
-    // 실제로 유효한 사진만 필터링
+    // 실제로 유효한 사진만 필터링 (Base64 데이터와 URL 모두 지원)
     const validPhotos = girl.photos ? girl.photos.filter(photo => 
-        photo && photo.photo_url && photo.photo_url.trim() !== ''
+        photo && photo.photo_url && photo.photo_url.trim() !== '' && 
+        (photo.photo_url.startsWith('data:') || photo.photo_url.startsWith('http'))
     ) : [];
     
     console.log('유효한 사진 개수:', validPhotos.length);
@@ -246,18 +247,15 @@ function showWorkingGirlModal(girl) {
     let photosHTML = '';
     
     if (validPhotos.length > 0) {
-        // 실제 등록된 사진만 표시
-        photosHTML = validPhotos.map(photo => `
-            <div class="aspect-square bg-gradient-to-br from-pink-200 to-purple-200 rounded-lg overflow-hidden flex items-center justify-center relative">
-                <img src="${photo.photo_url}" alt="${girl.nickname}" class="w-full h-full object-cover" 
-                     onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
-                     onload="this.nextElementSibling.style.display='none';">
-                <div class="absolute inset-0 flex flex-col items-center justify-center text-gray-600 font-medium" style="display: none;">
-                    <i class="fas fa-camera text-3xl mb-2"></i>
-                    <div class="text-sm">사진 로드 실패</div>
-                </div>
+        // 실제 등록된 사진만 표시 - 클릭 가능하도록 수정
+        photosHTML = validPhotos.map((photo, index) => {
+            const safePhotoUrl = photo.photo_url.replace(/'/g, "\\'");
+            return `
+            <div class="aspect-square bg-gradient-to-br from-pink-200 to-purple-200 rounded-lg overflow-hidden cursor-pointer hover:opacity-90 transition-opacity" onclick="window.openPhotoLightbox('${safePhotoUrl}', '${girl.nickname}')">
+                <img src="${photo.photo_url}" alt="${girl.nickname}" class="w-full h-full object-cover">
             </div>
-        `).join('');
+        `;
+        }).join('');
     } else {
         // 등록된 사진이 없는 경우에만 기본 표시
         photosHTML = `
@@ -324,11 +322,13 @@ function showWorkingGirlModal(girl) {
                         ` : ''}
                     </div>
 
-                    <!-- 연락처 정보 -->
-                    ${girl.phone ? `
+                    <!-- 조건 정보 -->
+                    ${girl.conditions ? `
                     <div class="mb-4">
-                        <label class="block text-sm font-medium text-gray-700">전화번호</label>
-                        <p class="mt-1 text-lg">${girl.phone}</p>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">조건</label>
+                        <div class="bg-gray-50 p-3 rounded-lg">
+                            <p class="text-gray-800 whitespace-pre-wrap">${girl.conditions}</p>
+                        </div>
                     </div>
                     ` : ''}
 
@@ -524,6 +524,14 @@ function showWorkingGirlRegister() {
                             </div>
                         </div>
 
+                        <!-- 조건 입력 -->
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">조건</label>
+                            <textarea id="reg-conditions" rows="4" 
+                                      class="w-full p-3 border border-gray-300 rounded-lg focus:border-thai-red focus:outline-none resize-vertical"
+                                      placeholder="서비스 조건을 입력해주세요..."></textarea>
+                        </div>
+
                         <!-- 사진 업로드 -->
                         <div class="mb-6">
                             <label class="block text-sm font-medium text-gray-700 mb-2">사진 업로드 (최대 10장)</label>
@@ -651,6 +659,7 @@ function registerWorkingGirl(event) {
     formData.append('kakao_id', document.getElementById('reg-kakao-id').value);
     formData.append('phone', document.getElementById('reg-phone').value);
     formData.append('code', document.getElementById('reg-code').value);
+    formData.append('conditions', document.getElementById('reg-conditions').value);
     
     // 사진 파일들
     const photoFiles = document.getElementById('reg-photos').files;
@@ -904,6 +913,14 @@ function showWorkingGirlEditModal(user) {
                             </div>
                         </div>
 
+                        <!-- 조건 입력 -->
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">조건</label>
+                            <textarea id="edit-conditions" rows="4" 
+                                      class="w-full p-3 border border-gray-300 rounded-lg focus:border-thai-red focus:outline-none resize-vertical"
+                                      placeholder="서비스 조건을 입력해주세요...">${user.conditions || ''}</textarea>
+                        </div>
+
                         <!-- 사진 업로드 -->
                         <div class="mb-6">
                             <label class="block text-sm font-medium text-gray-700 mb-2">사진 업로드 (최대 10장)</label>
@@ -1074,6 +1091,7 @@ async function updateWorkingGirlProfile(event) {
             requestData.append('kakao_id', document.getElementById('edit-kakao-id').value || '');
             requestData.append('phone', document.getElementById('edit-phone').value || '');
             requestData.append('code', document.getElementById('edit-code').value || '');
+            requestData.append('conditions', document.getElementById('edit-conditions').value || '');
             
             const newPassword = document.getElementById('edit-password').value;
             if (newPassword && newPassword.trim() !== '') {
@@ -1101,7 +1119,8 @@ async function updateWorkingGirlProfile(event) {
                 line_id: document.getElementById('edit-line-id').value || '',
                 kakao_id: document.getElementById('edit-kakao-id').value || '',
                 phone: document.getElementById('edit-phone').value || '',
-                code: document.getElementById('edit-code').value || ''
+                code: document.getElementById('edit-code').value || '',
+                conditions: document.getElementById('edit-conditions').value || ''
             };
             
             const newPassword = document.getElementById('edit-password').value;
@@ -1152,3 +1171,36 @@ async function updateWorkingGirlProfile(event) {
         showNotification('프로필 업데이트 중 오류가 발생했습니다: ' + error.message, 'error');
     }
 }
+
+// 사진 라이트박스 기능
+function showPhotoLightbox(photoUrl, nickname) {
+    const lightboxHTML = `
+        <div class="fixed inset-0 bg-black/80 flex items-center justify-center z-[60] photo-lightbox" onclick="closePhotoLightbox(event)">
+            <div class="relative max-w-[90vw] max-h-[90vh] flex items-center justify-center" onclick="event.stopPropagation()">
+                <img src="${photoUrl}" alt="${nickname}" class="max-w-full max-h-full object-contain rounded-lg shadow-2xl">
+                <button onclick="closePhotoLightbox()" class="absolute top-4 right-4 text-white bg-black/50 rounded-full w-10 h-10 flex items-center justify-center hover:bg-black/70 transition-colors">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', lightboxHTML);
+    document.body.style.overflow = 'hidden'; // 배경 스크롤 방지
+}
+
+function closePhotoLightbox(event) {
+    if (event && event.target !== event.currentTarget) return;
+    
+    const lightbox = document.querySelector('.photo-lightbox');
+    if (lightbox) {
+        lightbox.remove();
+        document.body.style.overflow = ''; // 스크롤 복원
+    }
+}
+
+// 전역 함수로 라이트박스 열기
+window.openPhotoLightbox = function(photoUrl, nickname) {
+    console.log('라이트박스 열기:', photoUrl, nickname);
+    showPhotoLightbox(photoUrl, nickname);
+};

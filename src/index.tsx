@@ -11,6 +11,36 @@ app.use('/api/*', cors())
 // 정적 파일 서빙
 app.use('/static/*', serveStatic({ root: './public' }))
 
+// 디버깅 페이지
+app.get('/debug', (c) => {
+  return c.html(`
+    <!DOCTYPE html>
+    <html>
+    <head><title>Debug</title></head>
+    <body>
+      <h1>Debug Page</h1>
+      <div id="result">Loading...</div>
+      <script>
+        console.log('Debug script loaded');
+        document.getElementById('result').innerHTML = 'JavaScript working!';
+        
+        fetch('/api/working-girls')
+          .then(res => res.json())
+          .then(data => {
+            console.log('API data:', data);
+            document.getElementById('result').innerHTML = 
+              'API works! Found ' + (data.working_girls ? data.working_girls.length : 0) + ' working girls';
+          })
+          .catch(err => {
+            console.error('API error:', err);
+            document.getElementById('result').innerHTML = 'API error: ' + err.message;
+          });
+      </script>
+    </body>
+    </html>
+  `)
+})
+
 // 메인 페이지
 app.get('/', async (c) => {
   const { env } = c
@@ -34,6 +64,7 @@ app.get('/', async (c) => {
           kakao_id TEXT,
           phone TEXT,
           code TEXT,
+          conditions TEXT,
           main_photo TEXT,
           is_active BOOLEAN DEFAULT 1,
           is_recommended BOOLEAN DEFAULT 0,
@@ -167,14 +198,6 @@ app.get('/', async (c) => {
                     <i class="fas fa-globe-asia text-2xl"></i>
                     <h1 class="text-2xl font-bold">타이위키</h1>
                     <span class="text-sm bg-white/20 px-2 py-1 rounded">Thai Wiki</span>
-                </div>
-
-                <!-- 활동상태 버튼 (로그인 시에만 표시) -->
-                <div id="activity-status" class="hidden items-center space-x-2">
-                    <span class="text-sm">활동상태:</span>
-                    <button id="status-toggle" class="bg-green-500 hover:bg-green-600 px-3 py-1 rounded-full text-sm font-medium transition-colors duration-200">
-                        ON
-                    </button>
                 </div>
 
                 <!-- 햄버거 메뉴 -->
@@ -407,6 +430,7 @@ app.post('/api/auth/working-girl/register', async (c) => {
       kakao_id: formData.get('kakao_id'),
       phone: formData.get('phone'),
       code: formData.get('code'),
+      conditions: formData.get('conditions'),
       is_active: formData.get('is_active') === 'true'
     }
 
@@ -423,13 +447,13 @@ app.post('/api/auth/working-girl/register', async (c) => {
     const insertResult = await env.DB.prepare(`
       INSERT INTO working_girls (
         user_id, password, nickname, age, height, weight, gender, region,
-        line_id, kakao_id, phone, code, is_active
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        line_id, kakao_id, phone, code, conditions, is_active
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       userData.user_id, userData.password, userData.nickname, userData.age,
       userData.height, userData.weight, userData.gender, userData.region,
       userData.line_id, userData.kakao_id, userData.phone, userData.code,
-      userData.is_active
+      userData.conditions, userData.is_active
     ).run()
 
     const workingGirlId = insertResult.meta.last_row_id
@@ -626,7 +650,7 @@ app.get('/api/working-girl/profile', async (c) => {
     // 워킹걸 정보 조회
     const workingGirl = await env.DB.prepare(`
       SELECT id, user_id, nickname, age, height, weight, gender, region, 
-             line_id, kakao_id, phone, code, main_photo, is_active, is_recommended
+             line_id, kakao_id, phone, code, conditions, main_photo, is_active, is_recommended
       FROM working_girls WHERE id = ?
     `).bind(session.user_id).first()
     
@@ -685,6 +709,7 @@ app.post('/api/working-girl/update-profile', async (c) => {
         kakao_id: jsonData.kakao_id,
         phone: jsonData.phone,
         code: jsonData.code,
+        conditions: jsonData.conditions,
         is_active: jsonData.is_active
       }
       
@@ -709,6 +734,7 @@ app.post('/api/working-girl/update-profile', async (c) => {
         kakao_id: formData.get('kakao_id'),
         phone: formData.get('phone'),
         code: formData.get('code'),
+        conditions: formData.get('conditions'),
         is_active: formData.get('is_active') === 'true'
       }
       
@@ -750,28 +776,28 @@ app.post('/api/working-girl/update-profile', async (c) => {
       updateQuery = `
         UPDATE working_girls SET
           nickname = ?, age = ?, height = ?, weight = ?, gender = ?, region = ?,
-          line_id = ?, kakao_id = ?, phone = ?, code = ?, password = ?, is_active = ?,
+          line_id = ?, kakao_id = ?, phone = ?, code = ?, conditions = ?, password = ?, is_active = ?,
           updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
       `
       updateParams = [
         userData.nickname, userData.age, userData.height, userData.weight,
         userData.gender, userData.region, userData.line_id, userData.kakao_id,
-        userData.phone, userData.code, newPassword, userData.is_active, workingGirlId
+        userData.phone, userData.code, userData.conditions, newPassword, userData.is_active, workingGirlId
       ]
     } else {
       // 비밀번호 제외 업데이트
       updateQuery = `
         UPDATE working_girls SET
           nickname = ?, age = ?, height = ?, weight = ?, gender = ?, region = ?,
-          line_id = ?, kakao_id = ?, phone = ?, code = ?, is_active = ?,
+          line_id = ?, kakao_id = ?, phone = ?, code = ?, conditions = ?, is_active = ?,
           updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
       `
       updateParams = [
         userData.nickname, userData.age, userData.height, userData.weight,
         userData.gender, userData.region, userData.line_id, userData.kakao_id,
-        userData.phone, userData.code, userData.is_active, workingGirlId
+        userData.phone, userData.code, userData.conditions, userData.is_active, workingGirlId
       ]
     }
 
