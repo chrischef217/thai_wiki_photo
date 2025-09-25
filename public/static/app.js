@@ -184,11 +184,11 @@ function displayWorkingGirls(workingGirls) {
         return `
             <div class="working-girl-card bg-white rounded-lg shadow-md overflow-hidden" onclick="showWorkingGirlDetail(${girl.id})">
                 <div class="relative">
-                    <div class="w-full h-48 bg-gradient-to-br from-pink-200 to-purple-200 flex items-center justify-center">
+                    <div class="w-full aspect-square bg-gradient-to-br from-pink-200 to-purple-200 flex items-center justify-center relative">
                         <img src="${mainPhoto}" alt="${girl.nickname}" class="w-full h-full object-cover" 
                              onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
                              onload="this.nextElementSibling.style.display='none';">
-                        <div class="absolute inset-0 flex items-center justify-center text-gray-600 font-medium" style="display: none;">
+                        <div class="absolute inset-0 flex flex-col items-center justify-center text-gray-600 font-medium" style="display: none;">
                             <i class="fas fa-user text-4xl mb-2"></i>
                             <div>${girl.nickname}</div>
                         </div>
@@ -235,9 +235,20 @@ function showWorkingGirlDetail(workingGirlId) {
 function showWorkingGirlModal(girl) {
     const photosHTML = girl.photos && girl.photos.length > 0 ? 
         girl.photos.map(photo => `
-            <img src="${photo.photo_url}" alt="${girl.nickname}" class="w-full h-48 object-cover rounded-lg" onerror="this.src='/static/images/default-avatar.jpg'">
+            <div class="aspect-square bg-gradient-to-br from-pink-200 to-purple-200 rounded-lg overflow-hidden flex items-center justify-center relative">
+                <img src="${photo.photo_url}" alt="${girl.nickname}" class="w-full h-full object-cover" 
+                     onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
+                     onload="this.nextElementSibling.style.display='none';">
+                <div class="absolute inset-0 flex flex-col items-center justify-center text-gray-600 font-medium" style="display: none;">
+                    <i class="fas fa-camera text-3xl mb-2"></i>
+                    <div class="text-sm">사진</div>
+                </div>
+            </div>
         `).join('') : 
-        `<img src="/static/images/default-avatar.jpg" alt="${girl.nickname}" class="w-full h-48 object-cover rounded-lg">`;
+        `<div class="aspect-square bg-gradient-to-br from-pink-200 to-purple-200 rounded-lg flex flex-col items-center justify-center text-gray-600 font-medium">
+            <i class="fas fa-user text-4xl mb-2"></i>
+            <div>${girl.nickname}</div>
+        </div>`;
 
     const modalHTML = `
         <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 modal-overlay p-4" onclick="closeModal(event)">
@@ -251,7 +262,7 @@ function showWorkingGirlModal(girl) {
                     </div>
 
                     <!-- 사진들 -->
-                    <div class="grid grid-cols-2 gap-4 mb-6">
+                    <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
                         ${photosHTML}
                     </div>
 
