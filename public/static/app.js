@@ -184,7 +184,15 @@ function displayWorkingGirls(workingGirls) {
         return `
             <div class="working-girl-card bg-white rounded-lg shadow-md overflow-hidden" onclick="showWorkingGirlDetail(${girl.id})">
                 <div class="relative">
-                    <img src="${mainPhoto}" alt="${girl.nickname}" class="w-full h-48 object-cover" onerror="this.src='/static/images/default-avatar.jpg'">
+                    <div class="w-full h-48 bg-gradient-to-br from-pink-200 to-purple-200 flex items-center justify-center">
+                        <img src="${mainPhoto}" alt="${girl.nickname}" class="w-full h-full object-cover" 
+                             onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
+                             onload="this.nextElementSibling.style.display='none';">
+                        <div class="absolute inset-0 flex items-center justify-center text-gray-600 font-medium" style="display: none;">
+                            <i class="fas fa-user text-4xl mb-2"></i>
+                            <div>${girl.nickname}</div>
+                        </div>
+                    </div>
                     ${recommendedBadge}
                     ${!girl.is_active ? '<div class="absolute top-2 right-2 bg-gray-500 text-white px-2 py-1 rounded text-xs">비활성</div>' : ''}
                 </div>
@@ -233,7 +241,7 @@ function showWorkingGirlModal(girl) {
 
     const modalHTML = `
         <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 modal-overlay p-4" onclick="closeModal(event)">
-            <div class="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto modal-content" onclick="event.stopPropagation()">
+            <div class="bg-white rounded-lg max-w-4xl w-full max-h-[95vh] overflow-y-auto modal-content" onclick="event.stopPropagation()">
                 <div class="p-6">
                     <div class="flex justify-between items-center mb-4">
                         <h2 class="text-2xl font-bold text-gray-800">${girl.nickname}</h2>
@@ -1007,40 +1015,79 @@ async function updateWorkingGirlProfile(event) {
         
         console.log('세션 정보:', sessionInfo);
         
-        // 2. 간단한 JSON 데이터만 사용 (일단 사진 제외)
-        const profileData = {
-            session_token: sessionInfo.session_token,
-            is_active: document.querySelector('input[name="is_active"]:checked').value === 'true',
-            nickname: document.getElementById('edit-nickname').value,
-            age: parseInt(document.getElementById('edit-age').value),
-            height: parseInt(document.getElementById('edit-height').value),
-            weight: parseInt(document.getElementById('edit-weight').value),
-            gender: document.getElementById('edit-gender').value,
-            region: document.getElementById('edit-region').value,
-            line_id: document.getElementById('edit-line-id').value || '',
-            kakao_id: document.getElementById('edit-kakao-id').value || '',
-            phone: document.getElementById('edit-phone').value || '',
-            code: document.getElementById('edit-code').value || ''
-        };
+        // 2. 사진 파일 체크 후 FormData 또는 JSON 사용
+        const photoFiles = document.getElementById('edit-photos').files;
+        let requestData, contentType;
         
-        // 비밀번호가 입력된 경우에만 포함
-        const newPassword = document.getElementById('edit-password').value;
-        if (newPassword && newPassword.trim() !== '') {
-            profileData.password = newPassword;
+        if (photoFiles.length > 0) {
+            // 사진이 있는 경우: FormData 사용
+            console.log('사진 업로드 포함:', photoFiles.length + '개 파일');
+            requestData = new FormData();
+            requestData.append('session_token', sessionInfo.session_token);
+            requestData.append('is_active', document.querySelector('input[name="is_active"]:checked').value);
+            requestData.append('nickname', document.getElementById('edit-nickname').value);
+            requestData.append('age', document.getElementById('edit-age').value);
+            requestData.append('height', document.getElementById('edit-height').value);
+            requestData.append('weight', document.getElementById('edit-weight').value);
+            requestData.append('gender', document.getElementById('edit-gender').value);
+            requestData.append('region', document.getElementById('edit-region').value);
+            requestData.append('line_id', document.getElementById('edit-line-id').value || '');
+            requestData.append('kakao_id', document.getElementById('edit-kakao-id').value || '');
+            requestData.append('phone', document.getElementById('edit-phone').value || '');
+            requestData.append('code', document.getElementById('edit-code').value || '');
+            
+            const newPassword = document.getElementById('edit-password').value;
+            if (newPassword && newPassword.trim() !== '') {
+                requestData.append('password', newPassword);
+            }
+            
+            // 사진 파일들 추가
+            for (let i = 0; i < photoFiles.length && i < 10; i++) {
+                requestData.append('photos', photoFiles[i]);
+            }
+            
+            contentType = null; // FormData는 Content-Type을 브라우저가 자동 설정
+        } else {
+            // 사진이 없는 경우: JSON 사용
+            console.log('사진 업로드 없음 - JSON 전송');
+            requestData = {
+                session_token: sessionInfo.session_token,
+                is_active: document.querySelector('input[name="is_active"]:checked').value === 'true',
+                nickname: document.getElementById('edit-nickname').value,
+                age: parseInt(document.getElementById('edit-age').value),
+                height: parseInt(document.getElementById('edit-height').value),
+                weight: parseInt(document.getElementById('edit-weight').value),
+                gender: document.getElementById('edit-gender').value,
+                region: document.getElementById('edit-region').value,
+                line_id: document.getElementById('edit-line-id').value || '',
+                kakao_id: document.getElementById('edit-kakao-id').value || '',
+                phone: document.getElementById('edit-phone').value || '',
+                code: document.getElementById('edit-code').value || ''
+            };
+            
+            const newPassword = document.getElementById('edit-password').value;
+            if (newPassword && newPassword.trim() !== '') {
+                requestData.password = newPassword;
+            }
+            
+            contentType = 'application/json';
+            requestData = JSON.stringify(requestData);
         }
         
-        console.log('전송할 데이터:', profileData);
+        console.log('전송 방식:', contentType ? 'JSON' : 'FormData');
         
-        // 3. 간단한 fetch 요청
-        console.log('API 요청 시작...');
-        
-        const response = await fetch('/api/working-girl/update-profile', {
+        // 3. 요청 전송
+        const fetchOptions = {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(profileData)
-        });
+            body: requestData
+        };
+        
+        if (contentType) {
+            fetchOptions.headers = { 'Content-Type': contentType };
+        }
+        
+        console.log('API 요청 시작...');
+        const response = await fetch('/api/working-girl/update-profile', fetchOptions);
         
         console.log('응답 상태:', response.status);
         
