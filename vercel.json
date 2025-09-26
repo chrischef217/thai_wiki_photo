@@ -1,15 +1,13 @@
 {
   "functions": {
-    "src/index.tsx": {
-      "runtime": "@vercel/node"
+    "api/index.js": {
+      "runtime": "@vercel/node@3.0.7"
     }
   },
   "rewrites": [
     {
       "source": "/(.*)",
-      "destination": "/src/index.tsx"
+      "destination": "/api"
     }
-  ],
-  "buildCommand": "npm run build",
-  "outputDirectory": "dist"
+  ]
 }
