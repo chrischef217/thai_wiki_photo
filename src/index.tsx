@@ -113,9 +113,31 @@ app.get('/', async (c) => {
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           username TEXT UNIQUE NOT NULL,
           password TEXT NOT NULL,
-          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+          email TEXT,
+          is_active BOOLEAN DEFAULT 1,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
       `).run()
+      
+      // 기존 관리자 테이블에 누락된 컬럼 추가
+      try {
+        await env.DB.prepare(`ALTER TABLE admins ADD COLUMN email TEXT`).run()
+      } catch (e) {
+        // 컬럼이 이미 존재하는 경우 무시
+      }
+      
+      try {
+        await env.DB.prepare(`ALTER TABLE admins ADD COLUMN is_active BOOLEAN DEFAULT 1`).run()
+      } catch (e) {
+        // 컬럼이 이미 존재하는 경우 무시
+      }
+      
+      try {
+        await env.DB.prepare(`ALTER TABLE admins ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP`).run()
+      } catch (e) {
+        // 컬럼이 이미 존재하는 경우 무시
+      }
 
       // 광고 테이블 생성
       await env.DB.prepare(`
@@ -151,7 +173,8 @@ app.get('/', async (c) => {
 
       // 기본 관리자 데이터 삽입
       await env.DB.prepare(`
-        INSERT OR IGNORE INTO admins (username, password) VALUES ('admin', '1127')
+        INSERT OR IGNORE INTO admins (username, password, email, is_active) 
+        VALUES ('admin', '1127', 'admin@thai-wiki.com', 1)
       `).run()
 
       // 테스트 데이터 삽입 제거됨 - 운영 환경에서는 테스트 데이터를 자동 생성하지 않음
