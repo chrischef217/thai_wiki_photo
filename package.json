@@ -2,7 +2,7 @@
   "name": "thaiwiki",
   "type": "module",
   "engines": {
-    "node": "18.x"
+    "node": "20.x"
   },
   "scripts": {
     "dev": "vite",
@@ -27,9 +27,8 @@
     "hono": "^4.9.6"
   },
   "devDependencies": {
-    "@hono/vite-build": "^1.2.0",
-    "@hono/vite-dev-server": "^0.18.2",
-    "vite": "^6.3.5",
-    "wrangler": "^4.4.0"
+    "@hono/vite-cloudflare-pages": "^0.4.2",
+    "vite": "^5.4.0",
+    "wrangler": "^3.78.0"
   }
 }
