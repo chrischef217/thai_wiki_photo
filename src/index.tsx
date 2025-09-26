@@ -2081,9 +2081,9 @@ app.post('/api/meeting-request', async (c) => {
       LIMIT 1
     `).bind(working_girl_id).first()
 
-    // 텔레그램 봇 토큰과 채널 ID (환경변수 또는 설정)
-    const TELEGRAM_BOT_TOKEN = env.TELEGRAM_BOT_TOKEN || '여기에_봇_토큰_입력'
-    const TELEGRAM_CHANNEL_ID = env.TELEGRAM_ADMIN_CHAT_ID || '여기에_채널_ID_입력'
+    // 텔레그램 봇 토큰과 채널 ID (환경변수 또는 하드코딩)
+    const TELEGRAM_BOT_TOKEN = env.TELEGRAM_BOT_TOKEN || '8421841441:AAF5nSc2uKAlZ53aShcibmZxMM8UdgaGhnU'
+    const TELEGRAM_CHANNEL_ID = env.TELEGRAM_ADMIN_CHAT_ID || '-1002871730755'
     
     // 텔레그램 메시지 내용 구성
     const telegramMessage = `
@@ -2259,19 +2259,9 @@ app.delete('/api/admin/advertisements/cleanup', async (c) => {
 app.get('/telegram-test', async (c) => {
   const { env } = c
   
-  const botToken = env.TELEGRAM_BOT_TOKEN
+  const botToken = env.TELEGRAM_BOT_TOKEN || '8421841441:AAF5nSc2uKAlZ53aShcibmZxMM8UdgaGhnU'
   
-  if (!botToken) {
-    return c.html(`
-      <div style="font-family: Arial, sans-serif; max-width: 800px; margin: 50px auto; padding: 20px;">
-        <h1>🤖 텔레그램 봇 설정</h1>
-        <div style="background: #f44336; color: white; padding: 15px; border-radius: 8px;">
-          <strong>❌ 봇 토큰이 설정되지 않았습니다!</strong><br>
-          <code>.dev.vars</code> 파일에 <code>TELEGRAM_BOT_TOKEN</code>을 추가해주세요.
-        </div>
-      </div>
-    `)
-  }
+  // 항상 성공 페이지 표시 (하드코딩된 토큰 사용)
   
   return c.html(`
     <div style="font-family: Arial, sans-serif; max-width: 800px; margin: 50px auto; padding: 20px;">
@@ -2378,9 +2368,9 @@ app.get('/telegram-test', async (c) => {
 app.get('/api/telegram/get-updates', async (c) => {
   const { env } = c
   
-  const botToken = env.TELEGRAM_BOT_TOKEN
+  const botToken = env.TELEGRAM_BOT_TOKEN || '8421841441:AAF5nSc2uKAlZ53aShcibmZxMM8UdgaGhnU'
   
-  if (!botToken) {
+  if (!botToken || botToken === '여기에_봇_토큰_입력') {
     return c.json({ success: false, message: '봇 토큰이 설정되지 않았습니다.' })
   }
   
