@@ -11,7 +11,7 @@ app.use('/api/*', cors())
 // 정적 파일 서빙
 app.use('/static/*', serveStatic({ root: './public' }))
 
-// 관리자 계정 수동 생성 API (임시)
+// 관리자 계정 디버깅 및 수정 API
 app.get('/setup-admin', async (c) => {
   const { env } = c
   
@@ -20,7 +20,9 @@ app.get('/setup-admin', async (c) => {
   }
   
   try {
-    // 관리자 테이블 생성
+    let output = '<h1>관리자 계정 디버깅</h1>'
+    
+    // 1. 관리자 테이블 생성
     await env.DB.prepare(`
       CREATE TABLE IF NOT EXISTS admins (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -32,32 +34,63 @@ app.get('/setup-admin', async (c) => {
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )
     `).run()
+    output += '<p>✅ 관리자 테이블 생성 완료</p>'
     
-    // 기존 관리자 삭제 후 새로 생성
-    await env.DB.prepare(`DELETE FROM admins WHERE username = 'admin'`).run()
+    // 2. 기존 관리자 계정 조회
+    const existingAdmins = await env.DB.prepare(`
+      SELECT id, username, password, email, is_active, created_at FROM admins
+    `).all()
+    output += `<p>📋 기존 관리자 계정들: <br><pre>${JSON.stringify(existingAdmins.results, null, 2)}</pre></p>`
     
-    // 관리자 계정 삽입
-    const result = await env.DB.prepare(`
-      INSERT INTO admins (username, password, email, is_active) 
-      VALUES ('admin', '1127', 'admin@thai-wiki.com', 1)
-    `).run()
+    // 3. 기존 관리자 삭제
+    await env.DB.prepare(`DELETE FROM admins`).run()
+    output += '<p>🗑️ 기존 관리자 계정 모두 삭제</p>'
     
-    // 확인용 조회
-    const admin = await env.DB.prepare(`
-      SELECT id, username, email, is_active, created_at FROM admins WHERE username = 'admin'
-    `).first()
+    // 4. 여러 비밀번호로 관리자 계정 생성
+    const passwords = ['1127', 'admin', '123456', 'password']
+    for (let i = 0; i < passwords.length; i++) {
+      const username = i === 0 ? 'admin' : `admin${i+1}`
+      const password = passwords[i]
+      
+      await env.DB.prepare(`
+        INSERT INTO admins (username, password, email, is_active) 
+        VALUES (?, ?, ?, 1)
+      `).bind(username, password, `${username}@thai-wiki.com`).run()
+      
+      output += `<p>➕ 생성: ${username} / ${password}</p>`
+    }
     
-    return c.html(`
-      <h1>관리자 계정 설정 완료!</h1>
-      <p>결과: ${JSON.stringify(result, null, 2)}</p>
-      <p>생성된 계정: ${JSON.stringify(admin, null, 2)}</p>
-      <p><strong>아이디: admin</strong></p>
-      <p><strong>비밀번호: 1127</strong></p>
-      <p><a href="/">메인으로 돌아가기</a></p>
-    `)
+    // 5. 생성된 계정 확인
+    const newAdmins = await env.DB.prepare(`
+      SELECT id, username, password, email, is_active, created_at FROM admins
+    `).all()
+    output += `<p>✅ 생성된 관리자 계정들: <br><pre>${JSON.stringify(newAdmins.results, null, 2)}</pre></p>`
+    
+    // 6. 로그인 테스트
+    output += '<h2>🧪 로그인 테스트</h2>'
+    for (const admin of newAdmins.results) {
+      try {
+        const testLogin = await env.DB.prepare(`
+          SELECT id, username, email, is_active, created_at, updated_at 
+          FROM admins WHERE username = ? AND password = ?
+        `).bind(admin.username, admin.password).first()
+        
+        if (testLogin) {
+          output += `<p style="color: green;">✅ ${admin.username}/${admin.password} - 로그인 성공</p>`
+        } else {
+          output += `<p style="color: red;">❌ ${admin.username}/${admin.password} - 로그인 실패</p>`
+        }
+      } catch (error) {
+        output += `<p style="color: red;">💥 ${admin.username}/${admin.password} - 에러: ${error.message}</p>`
+      }
+    }
+    
+    output += '<br><p><a href="/">메인으로 돌아가기</a></p>'
+    
+    return c.html(output)
     
   } catch (error) {
-    return c.text(`에러: ${error.message}`, 500)
+    return c.text(`전체 에러: ${error.message}`, 500)
   }
 })
 
