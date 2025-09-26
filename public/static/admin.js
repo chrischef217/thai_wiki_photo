@@ -62,18 +62,18 @@ function displayWorkingGirlsList() {
                 ${girl.is_recommended ? '<span class="text-yellow-500"><i class="fas fa-star"></i></span>' : '-'}
             </td>
             <td class="px-4 py-3">${girl.region || '-'}</td>
-            <td class="px-4 py-3">${girl.username}</td>
+            <td class="px-4 py-3">${girl.user_id || '-'}</td>
             <td class="px-4 py-3">${girl.nickname}</td>
             <td class="px-4 py-3">${girl.age || '-'}</td>
             <td class="px-4 py-3">${girl.height ? girl.height + 'cm' : '-'}</td>
             <td class="px-4 py-3">${girl.weight ? girl.weight + 'kg' : '-'}</td>
             <td class="px-4 py-3">
                 <span class="px-2 py-1 text-xs rounded-full ${
-                    girl.gender === 'female' ? 'bg-pink-100 text-pink-800' :
-                    girl.gender === 'male' ? 'bg-blue-100 text-blue-800' :
+                    girl.gender === '여자' ? 'bg-pink-100 text-pink-800' :
+                    girl.gender === '남자' ? 'bg-blue-100 text-blue-800' :
                     'bg-purple-100 text-purple-800'
                 }">
-                    ${girl.gender === 'female' ? '여성' : girl.gender === 'male' ? '남성' : '트랜스젠더'}
+                    ${girl.gender || '미입력'}
                 </span>
             </td>
             <td class="px-4 py-3">
@@ -129,16 +129,21 @@ async function editWorkingGirl(workingGirlId) {
             
             // 폼에 기존 데이터 설정
             document.getElementById('editingWorkingGirlId').value = workingGirl.id;
-            document.getElementById('wg_username').value = workingGirl.username || '';
+            document.getElementById('wg_username').value = workingGirl.user_id || '';
             document.getElementById('wg_nickname').value = workingGirl.nickname || '';
+            document.getElementById('wg_code').value = workingGirl.code || '';
             document.getElementById('wg_age').value = workingGirl.age || '';
             document.getElementById('wg_height').value = workingGirl.height || '';
             document.getElementById('wg_weight').value = workingGirl.weight || '';
-            document.getElementById('wg_gender').value = workingGirl.gender || 'female';
+            
+            // 성별 매핑 (DB → 폼)
+            const genderReverseMap = {'여자': 'female', '남자': 'male', '트랜스젠더': 'trans'};
+            document.getElementById('wg_gender').value = genderReverseMap[workingGirl.gender] || 'female';
+            
             document.getElementById('wg_region').value = workingGirl.region || '';
             document.getElementById('wg_phone').value = workingGirl.phone || '';
             document.getElementById('wg_line_id').value = workingGirl.line_id || '';
-            document.getElementById('wg_wechat_id').value = workingGirl.wechat_id || '';
+            document.getElementById('wg_wechat_id').value = workingGirl.kakao_id || '';
             document.getElementById('wg_is_recommended').checked = workingGirl.is_recommended;
             document.getElementById('wg_is_active').checked = workingGirl.is_active;
             
@@ -164,24 +169,30 @@ function displayExistingPhotos(photos) {
     const container = document.getElementById('existingPhotosList');
     selectedPhotosToDelete.clear();
     
-    if (photos.length === 0) {
+    // 실제로 유효한 사진만 필터링 (Base64 데이터와 URL 모두 지원)
+    const validPhotos = photos.filter(photo => 
+        photo && photo.photo_url && photo.photo_url.trim() !== '' && 
+        (photo.photo_url.startsWith('data:') || photo.photo_url.startsWith('http'))
+    );
+    
+    if (validPhotos.length === 0) {
         container.innerHTML = '<p class="text-gray-500 col-span-full text-center">등록된 사진이 없습니다.</p>';
         return;
     }
     
-    container.innerHTML = photos.map(photo => `
+    container.innerHTML = validPhotos.map(photo => `
         <div class="relative group" data-photo-id="${photo.id}">
-            <img src="${photo.photo_data}" 
+            <img src="${photo.photo_url}" 
                  alt="워킹걸 사진" 
                  class="w-full h-24 object-cover rounded border cursor-pointer"
-                 onclick="showPhotoLightbox('${photo.photo_data.replace(/'/g, '\\\'').replace(/"/g, '&quot;')}')">
+                 onclick="showPhotoLightbox('${photo.photo_url.replace(/'/g, '\\\'').replace(/"/g, '&quot;')}')">
             <button type="button" 
                     onclick="togglePhotoForDeletion(${photo.id})"
                     class="absolute top-1 right-1 bg-red-500 text-white rounded-full w-6 h-6 text-xs opacity-0 group-hover:opacity-100 transition-opacity">
                 <i class="fas fa-times"></i>
             </button>
             <div class="absolute bottom-1 left-1 bg-black bg-opacity-50 text-white text-xs px-1 rounded">
-                #${photo.photo_order}
+                #${photo.upload_order}
             </div>
         </div>
     `).join('');
@@ -209,31 +220,54 @@ function previewNewPhotos(input) {
     
     if (input.files.length === 0) return;
     
-    Array.from(input.files).forEach((file, index) => {
-        if (file.type.startsWith('image/')) {
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                const div = document.createElement('div');
-                div.className = 'relative group';
-                div.innerHTML = `
-                    <img src="${e.target.result}" 
-                         alt="새 사진 ${index + 1}" 
-                         class="w-full h-24 object-cover rounded border cursor-pointer"
-                         onclick="showPhotoLightbox('${e.target.result.replace(/'/g, '\\\'').replace(/"/g, '&quot;')}')">
-                    <button type="button" 
-                            onclick="removeNewPhoto(${index})"
-                            class="absolute top-1 right-1 bg-red-500 text-white rounded-full w-6 h-6 text-xs opacity-0 group-hover:opacity-100 transition-opacity">
-                        <i class="fas fa-times"></i>
-                    </button>
-                    <div class="absolute bottom-1 left-1 bg-black bg-opacity-50 text-white text-xs px-1 rounded">
-                        새 #${index + 1}
-                    </div>
-                `;
-                container.appendChild(div);
-            };
-            reader.readAsDataURL(file);
+    // 파일 필터링 및 검증
+    const validFiles = Array.from(input.files).filter((file, index) => {
+        // 이미지 파일 체크
+        if (!file.type.startsWith('image/')) {
+            alert(`파일 ${index + 1}: 이미지 파일만 업로드 가능합니다.`);
+            return false;
         }
+        
+        // 파일 크기 체크 (5MB 제한)
+        if (file.size > 5 * 1024 * 1024) {
+            alert(`파일 ${index + 1}: 파일 크기가 너무 큽니다. (최대 5MB)`);
+            return false;
+        }
+        
+        return true;
     });
+    
+    // 유효한 파일들만 미리보기 생성
+    validFiles.forEach((file, index) => {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const div = document.createElement('div');
+            div.className = 'relative group';
+            div.innerHTML = `
+                <img src="${e.target.result}" 
+                     alt="새 사진 ${index + 1}" 
+                     class="w-full h-24 object-cover rounded border cursor-pointer"
+                     onclick="showPhotoLightbox('${e.target.result.replace(/'/g, '\\\'').replace(/"/g, '&quot;')}')">
+                <button type="button" 
+                        onclick="removeNewPhoto(${index})"
+                        class="absolute top-1 right-1 bg-red-500 text-white rounded-full w-6 h-6 text-xs opacity-0 group-hover:opacity-100 transition-opacity">
+                    <i class="fas fa-times"></i>
+                </button>
+                <div class="absolute bottom-1 left-1 bg-black bg-opacity-50 text-white text-xs px-1 rounded">
+                    새 #${index + 1} (${(file.size / 1024 / 1024).toFixed(1)}MB)
+                </div>
+            `;
+            container.appendChild(div);
+        };
+        reader.readAsDataURL(file);
+    });
+    
+    // 유효하지 않은 파일이 있다면 input을 재설정
+    if (validFiles.length !== input.files.length) {
+        const dt = new DataTransfer();
+        validFiles.forEach(file => dt.items.add(file));
+        input.files = dt.files;
+    }
 }
 
 // 새 사진 제거
@@ -286,7 +320,7 @@ async function handleWorkingGirlSubmit(e) {
     const editingId = document.getElementById('editingWorkingGirlId').value;
     
     // 기본 정보 추가
-    const fields = ['username', 'nickname', 'age', 'height', 'weight', 'gender', 'region', 'phone', 'line_id', 'wechat_id'];
+    const fields = ['username', 'nickname', 'code', 'age', 'height', 'weight', 'gender', 'region', 'phone', 'line_id', 'wechat_id'];
     fields.forEach(field => {
         const element = document.getElementById(`wg_${field}`);
         if (element) {
@@ -388,14 +422,17 @@ async function viewWorkingGirlPhotos(workingGirlId) {
                     </div>
                     <div class="p-6">
                         <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                            ${photos.map(photo => `
+                            ${photos.filter(photo => 
+                                photo && photo.photo_url && photo.photo_url.trim() !== '' && 
+                                (photo.photo_url.startsWith('data:') || photo.photo_url.startsWith('http'))
+                            ).map(photo => `
                                 <div class="relative">
-                                    <img src="${photo.photo_data}" 
+                                    <img src="${photo.photo_url}" 
                                          alt="워킹걸 사진" 
                                          class="w-full h-32 object-cover rounded cursor-pointer hover:opacity-80"
-                                         onclick="showPhotoLightbox('${photo.photo_data.replace(/'/g, '\\\'').replace(/"/g, '&quot;')}')">
+                                         onclick="showPhotoLightbox('${photo.photo_url.replace(/'/g, '\\\'').replace(/"/g, '&quot;')}')">
                                     <div class="absolute bottom-1 left-1 bg-black bg-opacity-50 text-white text-xs px-1 rounded">
-                                        #${photo.photo_order}
+                                        #${photo.upload_order}
                                     </div>
                                 </div>
                             `).join('')}

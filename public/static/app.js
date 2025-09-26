@@ -303,7 +303,7 @@ function showWorkingGirlModal(girl) {
                             <div class="space-y-2 text-sm">
                                 <div class="flex justify-between">
                                     <span class="text-gray-600">아이디:</span>
-                                    <span class="font-medium">${girl.username || '미입력'}</span>
+                                    <span class="font-medium">${girl.user_id || '미입력'}</span>
                                 </div>
                                 <div class="flex justify-between">
                                     <span class="text-gray-600">닉네임:</span>
@@ -315,12 +315,7 @@ function showWorkingGirlModal(girl) {
                                 </div>
                                 <div class="flex justify-between">
                                     <span class="text-gray-600">성별:</span>
-                                    <span class="font-medium">${
-                                        girl.gender === 'female' ? '여성' :
-                                        girl.gender === 'male' ? '남성' :
-                                        girl.gender === 'trans' ? '트랜스젠더' :
-                                        girl.gender || '미입력'
-                                    }</span>
+                                    <span class="font-medium">${girl.gender || '미입력'}</span>
                                 </div>
                             </div>
                         </div>

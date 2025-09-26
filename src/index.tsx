@@ -1066,22 +1066,27 @@ app.get('/admin', async (c) => {
                                   <div>
                                       <label class="block text-sm font-medium mb-2">아이디 *</label>
                                       <input type="text" id="wg_username" name="username" required
-                                             class="w-full p-3 border border-gray-300 rounded-lg focus:border-thai-blue focus:outline-none">
+                                             class="w-full p-3 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none">
                                   </div>
                                   <div>
                                       <label class="block text-sm font-medium mb-2">닉네임 *</label>
                                       <input type="text" id="wg_nickname" name="nickname" required
-                                             class="w-full p-3 border border-gray-300 rounded-lg focus:border-thai-blue focus:outline-none">
+                                             class="w-full p-3 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none">
+                                  </div>
+                                  <div>
+                                      <label class="block text-sm font-medium mb-2">관리 코드</label>
+                                      <input type="text" id="wg_code" name="code" placeholder="VIP001, GOLD003 등"
+                                             class="w-full p-3 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none">
                                   </div>
                                   <div>
                                       <label class="block text-sm font-medium mb-2">나이</label>
                                       <input type="number" id="wg_age" name="age" min="18" max="60"
-                                             class="w-full p-3 border border-gray-300 rounded-lg focus:border-thai-blue focus:outline-none">
+                                             class="w-full p-3 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none">
                                   </div>
                                   <div>
                                       <label class="block text-sm font-medium mb-2">성별</label>
                                       <select id="wg_gender" name="gender"
-                                              class="w-full p-3 border border-gray-300 rounded-lg focus:border-thai-blue focus:outline-none">
+                                              class="w-full p-3 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none">
                                           <option value="female">여성</option>
                                           <option value="male">남성</option>
                                           <option value="trans">트랜스젠더</option>
@@ -1090,17 +1095,17 @@ app.get('/admin', async (c) => {
                                   <div>
                                       <label class="block text-sm font-medium mb-2">키 (cm)</label>
                                       <input type="number" id="wg_height" name="height" min="140" max="200"
-                                             class="w-full p-3 border border-gray-300 rounded-lg focus:border-thai-blue focus:outline-none">
+                                             class="w-full p-3 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none">
                                   </div>
                                   <div>
                                       <label class="block text-sm font-medium mb-2">몸무게 (kg)</label>
                                       <input type="number" id="wg_weight" name="weight" min="40" max="120"
-                                             class="w-full p-3 border border-gray-300 rounded-lg focus:border-thai-blue focus:outline-none">
+                                             class="w-full p-3 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none">
                                   </div>
                                   <div>
                                       <label class="block text-sm font-medium mb-2">지역 *</label>
                                       <select id="wg_region" name="region" required
-                                              class="w-full p-3 border border-gray-300 rounded-lg focus:border-thai-blue focus:outline-none">
+                                              class="w-full p-3 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none">
                                           <option value="">지역 선택</option>
                                           <option value="방콕">방콕</option>
                                           <option value="파타야">파타야</option>
@@ -1118,17 +1123,17 @@ app.get('/admin', async (c) => {
                                       <div>
                                           <label class="block text-sm font-medium mb-2">전화번호</label>
                                           <input type="text" id="wg_phone" name="phone"
-                                                 class="w-full p-3 border border-gray-300 rounded-lg focus:border-thai-blue focus:outline-none">
+                                                 class="w-full p-3 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none">
                                       </div>
                                       <div>
                                           <label class="block text-sm font-medium mb-2">라인 ID</label>
                                           <input type="text" id="wg_line_id" name="line_id"
-                                                 class="w-full p-3 border border-gray-300 rounded-lg focus:border-thai-blue focus:outline-none">
+                                                 class="w-full p-3 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none">
                                       </div>
                                       <div>
-                                          <label class="block text-sm font-medium mb-2">위챗 ID</label>
+                                          <label class="block text-sm font-medium mb-2">카카오톡 ID</label>
                                           <input type="text" id="wg_wechat_id" name="wechat_id"
-                                                 class="w-full p-3 border border-gray-300 rounded-lg focus:border-thai-blue focus:outline-none">
+                                                 class="w-full p-3 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none">
                                       </div>
                                   </div>
                               </div>
@@ -1139,12 +1144,12 @@ app.get('/admin', async (c) => {
                                   <div class="flex space-x-6">
                                       <label class="flex items-center space-x-2">
                                           <input type="checkbox" id="wg_is_recommended" name="is_recommended"
-                                                 class="w-4 h-4 text-thai-blue border-gray-300 rounded focus:ring-thai-blue">
+                                                 class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
                                           <span>추천 워킹걸</span>
                                       </label>
                                       <label class="flex items-center space-x-2">
                                           <input type="checkbox" id="wg_is_active" name="is_active" checked
-                                                 class="w-4 h-4 text-thai-blue border-gray-300 rounded focus:ring-thai-blue">
+                                                 class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
                                           <span>활성 상태</span>
                                       </label>
                                   </div>
@@ -1172,7 +1177,7 @@ app.get('/admin', async (c) => {
                                                   class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg">
                                               <i class="fas fa-camera mr-2"></i>사진 선택 (여러장 가능)
                                           </button>
-                                          <p class="text-sm text-gray-500 mt-2">JPG, PNG 파일만 업로드 가능</p>
+                                          <p class="text-sm text-gray-500 mt-2">JPG, PNG 파일만 업로드 가능 (최대 5MB)</p>
                                       </div>
                                       
                                       <!-- 새 사진 미리보기 -->
@@ -1189,7 +1194,7 @@ app.get('/admin', async (c) => {
                                       취소
                                   </button>
                                   <button type="submit" id="submitBtn"
-                                          class="px-6 py-2 bg-thai-blue hover:bg-blue-700 text-white rounded-lg">
+                                          class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium">
                                       <i class="fas fa-save mr-2"></i>저장
                                   </button>
                               </div>
@@ -1237,54 +1242,50 @@ app.post('/api/admin/working-girls', async (c) => {
     const formData = await c.req.formData()
     
     // 필수 필드 검증
-    const username = formData.get('username')?.toString()
+    const user_id = formData.get('username')?.toString()
     const nickname = formData.get('nickname')?.toString()
     const region = formData.get('region')?.toString()
+    const password = formData.get('password')?.toString() || '1234'
     
-    if (!username || !nickname || !region) {
+    if (!user_id || !nickname || !region) {
       return c.json({ success: false, message: '필수 정보가 누락되었습니다.' }, 400)
     }
 
     // 중복 아이디 체크
-    const existingUser = await env.DB.prepare(`SELECT id FROM working_girls WHERE username = ?`).bind(username).first()
+    const existingUser = await env.DB.prepare(`SELECT id FROM working_girls WHERE user_id = ?`).bind(user_id).first()
     if (existingUser) {
       return c.json({ success: false, message: '이미 존재하는 아이디입니다.' }, 400)
     }
 
-    // 워킹걸 데이터 삽입
-    const workingGirlData = {
-      username,
-      nickname,
-      age: parseInt(formData.get('age')?.toString() || '0'),
-      height: parseInt(formData.get('height')?.toString() || '0'),
-      weight: parseInt(formData.get('weight')?.toString() || '0'),
-      gender: formData.get('gender')?.toString() || 'female',
-      region,
-      phone: formData.get('phone')?.toString() || '',
-      line_id: formData.get('line_id')?.toString() || '',
-      wechat_id: formData.get('wechat_id')?.toString() || '',
-      is_recommended: formData.get('is_recommended') === 'true',
-      is_active: formData.get('is_active') !== 'false'
+    // 성별 변환
+    const genderMap = {
+      'female': '여자',
+      'male': '남자', 
+      'trans': '트랜스젠더'
     }
+    const gender = genderMap[formData.get('gender')?.toString() || 'female'] || '여자'
 
+    // 워킹걸 데이터 삽입
     const result = await env.DB.prepare(`
       INSERT INTO working_girls (
-        username, nickname, age, height, weight, gender, region,
-        phone, line_id, wechat_id, is_recommended, is_active
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        user_id, password, nickname, age, height, weight, gender, region,
+        phone, line_id, kakao_id, code, is_recommended, is_active
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
-      workingGirlData.username,
-      workingGirlData.nickname,
-      workingGirlData.age,
-      workingGirlData.height,
-      workingGirlData.weight,
-      workingGirlData.gender,
-      workingGirlData.region,
-      workingGirlData.phone,
-      workingGirlData.line_id,
-      workingGirlData.wechat_id,
-      workingGirlData.is_recommended ? 1 : 0,
-      workingGirlData.is_active ? 1 : 0
+      user_id,
+      password,
+      nickname,
+      parseInt(formData.get('age')?.toString() || '0'),
+      parseInt(formData.get('height')?.toString() || '0'),
+      parseInt(formData.get('weight')?.toString() || '0'),
+      gender,
+      region,
+      formData.get('phone')?.toString() || '',
+      formData.get('line_id')?.toString() || '',
+      formData.get('wechat_id')?.toString() || '', // kakao_id로 저장
+      formData.get('code')?.toString() || '',
+      formData.get('is_recommended') === 'true' ? 1 : 0,
+      formData.get('is_active') !== 'false' ? 1 : 0
     ).run()
 
     const workingGirlId = result.meta.last_row_id
@@ -1296,17 +1297,45 @@ app.post('/api/admin/working-girls', async (c) => {
     while (formData.get(`photo_${photoIndex}`)) {
       const photoFile = formData.get(`photo_${photoIndex}`) as File
       if (photoFile && photoFile.size > 0) {
-        const buffer = await photoFile.arrayBuffer()
-        const base64 = btoa(String.fromCharCode(...new Uint8Array(buffer)))
-        const mimeType = photoFile.type
-        const dataUrl = `data:${mimeType};base64,${base64}`
-        
-        await env.DB.prepare(`
-          INSERT INTO photos (working_girl_id, photo_data, photo_order)
-          VALUES (?, ?, ?)
-        `).bind(workingGirlId, dataUrl, photoIndex + 1).run()
-        
-        photos.push({ order: photoIndex + 1, data: dataUrl })
+        try {
+          // 파일 크기 제한 (5MB)
+          if (photoFile.size > 5 * 1024 * 1024) {
+            console.error(`Photo ${photoIndex} too large: ${photoFile.size} bytes`);
+            photoIndex++
+            continue;
+          }
+
+          const buffer = await photoFile.arrayBuffer()
+          
+          // 안전한 Base64 인코딩 (큰 파일에 대한 스택 오버플로 방지)
+          const uint8Array = new Uint8Array(buffer)
+          let base64 = ''
+          const chunkSize = 8192 // 8KB 청크로 나누어 처리
+          
+          for (let i = 0; i < uint8Array.length; i += chunkSize) {
+            const chunk = uint8Array.subarray(i, i + chunkSize)
+            base64 += btoa(String.fromCharCode.apply(null, Array.from(chunk)))
+          }
+          
+          const mimeType = photoFile.type
+          const dataUrl = `data:${mimeType};base64,${base64}`
+          
+          await env.DB.prepare(`
+            INSERT INTO working_girl_photos (working_girl_id, photo_url, is_main, upload_order)
+            VALUES (?, ?, ?, ?)
+          `).bind(workingGirlId, dataUrl, photoIndex === 0 ? 1 : 0, photoIndex + 1).run()
+          
+          // 첫 번째 사진을 메인 사진으로 설정
+          if (photoIndex === 0) {
+            await env.DB.prepare(`
+              UPDATE working_girls SET main_photo = ? WHERE id = ?
+            `).bind(dataUrl, workingGirlId).run()
+          }
+          
+          photos.push({ order: photoIndex + 1, url: dataUrl })
+        } catch (photoError) {
+          console.error(`Error processing photo ${photoIndex}:`, photoError)
+        }
       }
       photoIndex++
     }
@@ -1314,7 +1343,7 @@ app.post('/api/admin/working-girls', async (c) => {
     return c.json({ 
       success: true, 
       message: '워킹걸이 성공적으로 등록되었습니다.',
-      workingGirl: { id: workingGirlId, ...workingGirlData },
+      workingGirl: { id: workingGirlId },
       photos
     })
     
@@ -1339,49 +1368,43 @@ app.put('/api/admin/working-girls/:id', async (c) => {
     }
 
     // 아이디 중복 체크 (현재 사용자 제외)
-    const username = formData.get('username')?.toString()
-    if (username && username !== existingGirl.username) {
-      const duplicateUser = await env.DB.prepare(`SELECT id FROM working_girls WHERE username = ? AND id != ?`).bind(username, workingGirlId).first()
+    const user_id = formData.get('username')?.toString()
+    if (user_id && user_id !== existingGirl.user_id) {
+      const duplicateUser = await env.DB.prepare(`SELECT id FROM working_girls WHERE user_id = ? AND id != ?`).bind(user_id, workingGirlId).first()
       if (duplicateUser) {
         return c.json({ success: false, message: '이미 존재하는 아이디입니다.' }, 400)
       }
     }
 
-    // 워킹걸 정보 업데이트
-    const updateData = {
-      username: formData.get('username')?.toString() || existingGirl.username,
-      nickname: formData.get('nickname')?.toString() || existingGirl.nickname,
-      age: parseInt(formData.get('age')?.toString() || existingGirl.age?.toString() || '0'),
-      height: parseInt(formData.get('height')?.toString() || existingGirl.height?.toString() || '0'),
-      weight: parseInt(formData.get('weight')?.toString() || existingGirl.weight?.toString() || '0'),
-      gender: formData.get('gender')?.toString() || existingGirl.gender,
-      region: formData.get('region')?.toString() || existingGirl.region,
-      phone: formData.get('phone')?.toString() || existingGirl.phone || '',
-      line_id: formData.get('line_id')?.toString() || existingGirl.line_id || '',
-      wechat_id: formData.get('wechat_id')?.toString() || existingGirl.wechat_id || '',
-      is_recommended: formData.get('is_recommended') === 'true',
-      is_active: formData.get('is_active') !== 'false'
+    // 성별 변환
+    const genderMap = {
+      'female': '여자',
+      'male': '남자', 
+      'trans': '트랜스젠더'
     }
+    const gender = genderMap[formData.get('gender')?.toString() || 'female'] || existingGirl.gender
 
+    // 워킹걸 정보 업데이트
     await env.DB.prepare(`
       UPDATE working_girls SET
-        username = ?, nickname = ?, age = ?, height = ?, weight = ?,
-        gender = ?, region = ?, phone = ?, line_id = ?, wechat_id = ?,
+        user_id = ?, nickname = ?, age = ?, height = ?, weight = ?,
+        gender = ?, region = ?, phone = ?, line_id = ?, kakao_id = ?, code = ?,
         is_recommended = ?, is_active = ?
       WHERE id = ?
     `).bind(
-      updateData.username,
-      updateData.nickname,
-      updateData.age,
-      updateData.height,
-      updateData.weight,
-      updateData.gender,
-      updateData.region,
-      updateData.phone,
-      updateData.line_id,
-      updateData.wechat_id,
-      updateData.is_recommended ? 1 : 0,
-      updateData.is_active ? 1 : 0,
+      user_id || existingGirl.user_id,
+      formData.get('nickname')?.toString() || existingGirl.nickname,
+      parseInt(formData.get('age')?.toString() || existingGirl.age?.toString() || '0'),
+      parseInt(formData.get('height')?.toString() || existingGirl.height?.toString() || '0'),
+      parseInt(formData.get('weight')?.toString() || existingGirl.weight?.toString() || '0'),
+      gender,
+      formData.get('region')?.toString() || existingGirl.region,
+      formData.get('phone')?.toString() || existingGirl.phone || '',
+      formData.get('line_id')?.toString() || existingGirl.line_id || '',
+      formData.get('wechat_id')?.toString() || existingGirl.kakao_id || '',
+      formData.get('code')?.toString() || existingGirl.code || '',
+      formData.get('is_recommended') === 'true' ? 1 : 0,
+      formData.get('is_active') !== 'false' ? 1 : 0,
       workingGirlId
     ).run()
 
@@ -1392,23 +1415,44 @@ app.put('/api/admin/working-girls/:id', async (c) => {
     while (formData.get(`new_photo_${photoIndex}`)) {
       const photoFile = formData.get(`new_photo_${photoIndex}`) as File
       if (photoFile && photoFile.size > 0) {
-        const buffer = await photoFile.arrayBuffer()
-        const base64 = btoa(String.fromCharCode(...new Uint8Array(buffer)))
-        const mimeType = photoFile.type
-        const dataUrl = `data:${mimeType};base64,${base64}`
-        
-        // 다음 photo_order 계산
-        const lastOrder = await env.DB.prepare(`
-          SELECT MAX(photo_order) as max_order FROM photos WHERE working_girl_id = ?
-        `).bind(workingGirlId).first()
-        const nextOrder = (lastOrder?.max_order || 0) + 1
-        
-        await env.DB.prepare(`
-          INSERT INTO photos (working_girl_id, photo_data, photo_order)
-          VALUES (?, ?, ?)
-        `).bind(workingGirlId, dataUrl, nextOrder).run()
-        
-        newPhotos.push({ order: nextOrder, data: dataUrl })
+        try {
+          // 파일 크기 제한 (5MB)
+          if (photoFile.size > 5 * 1024 * 1024) {
+            console.error(`Photo ${photoIndex} too large: ${photoFile.size} bytes`);
+            photoIndex++
+            continue;
+          }
+
+          const buffer = await photoFile.arrayBuffer()
+          
+          // 안전한 Base64 인코딩 (큰 파일에 대한 스택 오버플로 방지)
+          const uint8Array = new Uint8Array(buffer)
+          let base64 = ''
+          const chunkSize = 8192 // 8KB 청크로 나누어 처리
+          
+          for (let i = 0; i < uint8Array.length; i += chunkSize) {
+            const chunk = uint8Array.subarray(i, i + chunkSize)
+            base64 += btoa(String.fromCharCode.apply(null, Array.from(chunk)))
+          }
+          
+          const mimeType = photoFile.type
+          const dataUrl = `data:${mimeType};base64,${base64}`
+          
+          // 다음 upload_order 계산
+          const lastOrder = await env.DB.prepare(`
+            SELECT MAX(upload_order) as max_order FROM working_girl_photos WHERE working_girl_id = ?
+          `).bind(workingGirlId).first()
+          const nextOrder = (lastOrder?.max_order || 0) + 1
+          
+          await env.DB.prepare(`
+            INSERT INTO working_girl_photos (working_girl_id, photo_url, is_main, upload_order)
+            VALUES (?, ?, ?, ?)
+          `).bind(workingGirlId, dataUrl, 0, nextOrder).run()
+          
+          newPhotos.push({ order: nextOrder, url: dataUrl })
+        } catch (photoError) {
+          console.error(`Error processing photo ${photoIndex}:`, photoError)
+        }
       }
       photoIndex++
     }
@@ -1418,7 +1462,7 @@ app.put('/api/admin/working-girls/:id', async (c) => {
     if (deletePhotoIds) {
       const photoIdsToDelete = deletePhotoIds.split(',').filter(id => id.trim())
       for (const photoId of photoIdsToDelete) {
-        await env.DB.prepare(`DELETE FROM photos WHERE id = ? AND working_girl_id = ?`)
+        await env.DB.prepare(`DELETE FROM working_girl_photos WHERE id = ? AND working_girl_id = ?`)
           .bind(photoId.trim(), workingGirlId).run()
       }
     }
@@ -1426,7 +1470,6 @@ app.put('/api/admin/working-girls/:id', async (c) => {
     return c.json({ 
       success: true, 
       message: '워킹걸 정보가 성공적으로 수정되었습니다.',
-      workingGirl: { id: workingGirlId, ...updateData },
       newPhotos
     })
     
@@ -1449,7 +1492,7 @@ app.delete('/api/admin/working-girls/:id', async (c) => {
     }
 
     // 관련 사진 먼저 삭제
-    await env.DB.prepare(`DELETE FROM photos WHERE working_girl_id = ?`).bind(workingGirlId).run()
+    await env.DB.prepare(`DELETE FROM working_girl_photos WHERE working_girl_id = ?`).bind(workingGirlId).run()
     
     // 워킹걸 정보 삭제
     await env.DB.prepare(`DELETE FROM working_girls WHERE id = ?`).bind(workingGirlId).run()
@@ -1473,13 +1516,13 @@ app.get('/api/admin/working-girls', async (c) => {
     const search = c.req.query('search') || ''
     let query = `
       SELECT wg.*, 
-        (SELECT COUNT(*) FROM photos WHERE working_girl_id = wg.id) as photo_count
+        (SELECT COUNT(*) FROM working_girl_photos WHERE working_girl_id = wg.id) as photo_count
       FROM working_girls wg
     `
     let params = []
     
     if (search) {
-      query += ` WHERE (username LIKE ? OR nickname LIKE ? OR region LIKE ?)`
+      query += ` WHERE (user_id LIKE ? OR nickname LIKE ? OR region LIKE ?)`
       params = [`%${search}%`, `%${search}%`, `%${search}%`]
     }
     
@@ -1512,7 +1555,7 @@ app.get('/api/admin/working-girls/:id', async (c) => {
 
     // 사진 정보
     const photos = await env.DB.prepare(`
-      SELECT * FROM photos WHERE working_girl_id = ? ORDER BY photo_order ASC
+      SELECT * FROM working_girl_photos WHERE working_girl_id = ? ORDER BY upload_order ASC
     `).bind(workingGirlId).all()
 
     return c.json({ 
