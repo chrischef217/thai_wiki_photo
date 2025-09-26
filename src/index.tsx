@@ -71,7 +71,7 @@ app.get('/setup-admin', async (c) => {
     for (const admin of newAdmins.results) {
       try {
         const testLogin = await env.DB.prepare(`
-          SELECT id, username, email, is_active, created_at, updated_at 
+          SELECT id, username, email, is_active, created_at 
           FROM admins WHERE username = ? AND password = ?
         `).bind(admin.username, admin.password).first()
         
@@ -694,7 +694,7 @@ app.post('/api/auth/admin/login', async (c) => {
 
   try {
     const admin = await env.DB.prepare(`
-      SELECT id, username, email, is_active, created_at, updated_at 
+      SELECT id, username, email, is_active, created_at 
       FROM admins WHERE username = ? AND password = ?
     `).bind(username, password).first()
 
@@ -746,7 +746,7 @@ app.post('/api/auth/verify-session', async (c) => {
       `).bind(session.user_id).first()
     } else if (session.user_type === 'admin') {
       user = await env.DB.prepare(`
-        SELECT id, username, email, is_active, created_at, updated_at
+        SELECT id, username, email, is_active, created_at
         FROM admins WHERE id = ?
       `).bind(session.user_id).first()
     }
