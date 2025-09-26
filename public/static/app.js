@@ -436,24 +436,38 @@ function requestMeeting(workingGirlId) {
                         </div>
                         
                         <div class="mb-4">
-                            <label class="block text-sm font-medium text-gray-700 mb-2">현재 위치</label>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">현재 위치 *</label>
                             <div class="flex space-x-2">
                                 <button type="button" onclick="getCurrentLocation()" 
                                         class="flex-1 bg-blue-500 hover:bg-blue-600 text-white py-2 px-3 rounded-lg font-medium transition-colors duration-200">
                                     <i class="fas fa-map-marker-alt mr-2"></i>위치 확인
                                 </button>
                                 <div id="location-status" class="flex-2 p-2 text-sm text-gray-600">
-                                    위치를 확인해주세요
+                                    위치를 확인해주세요 (필수)
                                 </div>
                             </div>
                             <input type="hidden" id="user-location" value="">
                         </div>
                         
-                        <div class="mb-6">
+                        <div class="mb-4">
                             <label class="block text-sm font-medium text-gray-700 mb-2">추가 메시지 (선택)</label>
                             <textarea id="meeting-message" rows="3" 
                                       placeholder="간단한 인사나 요청 사항을 입력해주세요..."
                                       class="w-full p-3 border border-gray-300 rounded-lg focus:border-thai-red focus:outline-none resize-vertical"></textarea>
+                        </div>
+                        
+                        <!-- 안내 메시지 -->
+                        <div class="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                            <div class="flex items-start">
+                                <i class="fas fa-info-circle text-blue-500 mt-1 mr-3"></i>
+                                <div class="text-sm text-blue-800">
+                                    <p class="font-semibold mb-2">📱 만남 요청 안내사항</p>
+                                    <p class="leading-relaxed">
+                                        만남 요청은 텔레그램으로 전송되오니, 반드시 텔레그램을 사용해 주셔야 합니다. 
+                                        요청을 보내신 후 담당자가 내용을 확인하여 고객님께 텔레그램으로 메시지를 보내드리겠습니다.
+                                    </p>
+                                </div>
+                            </div>
                         </div>
                         
                         <div class="flex space-x-3">
@@ -1391,12 +1405,20 @@ async function getCurrentLocation() {
             const locationData = await response.json();
             const address = locationData.locality || locationData.city || '주소 확인 불가';
             
-            locationStatus.innerHTML = `<span class="text-green-600"><i class="fas fa-check mr-1"></i>${address}</span>`;
+            locationStatus.innerHTML = `<span class="text-green-600 font-semibold"><i class="fas fa-check-circle mr-1"></i>✓ ${address}</span>`;
         } catch (e) {
-            locationStatus.innerHTML = `<span class="text-green-600"><i class="fas fa-check mr-1"></i>위치 확인됨</span>`;
+            locationStatus.innerHTML = `<span class="text-green-600 font-semibold"><i class="fas fa-check-circle mr-1"></i>✓ 위치 확인 완료</span>`;
         }
         
         locationInput.value = googleMapsUrl;
+        
+        // 위치 확인 버튼 상태 변경
+        const locationButton = document.querySelector('button[onclick="getCurrentLocation()"]');
+        if (locationButton) {
+            locationButton.innerHTML = '<i class="fas fa-check mr-2"></i>위치 확인됨';
+            locationButton.className = 'flex-1 bg-green-500 hover:bg-green-600 text-white py-2 px-3 rounded-lg font-medium transition-colors duration-200';
+            locationButton.disabled = true;
+        }
         
     } catch (error) {
         console.error('위치 확인 오류:', error);
@@ -1427,6 +1449,11 @@ async function submitMeetingRequest(event, workingGirlId) {
         
         if (!userName || !userTelegram) {
             showNotification('이름과 텔레그램 아이디는 필수입니다.', 'warning');
+            return;
+        }
+        
+        if (!userLocation) {
+            showNotification('위치 확인이 필요합니다. "위치 확인" 버튼을 눌러주세요.', 'warning');
             return;
         }
         
