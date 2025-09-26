@@ -300,9 +300,12 @@ app.get('/api/working-girls', async (c) => {
   const { env } = c
 
   try {
-    // 워킹걸 기본 정보만 먼저 조회
+    // 워킹걸 기본 정보만 먼저 조회 (패스워드 제외)
     const girlsResult = await env.DB.prepare(`
-      SELECT * FROM working_girls 
+      SELECT id, user_id, nickname, age, height, weight, gender, region, 
+             line_id, kakao_id, phone, management_code, agency, conditions, 
+             main_photo, is_active, is_recommended, created_at, updated_at
+      FROM working_girls 
       WHERE is_active = 1
       ORDER BY is_recommended DESC, created_at DESC
     `).all()
@@ -339,7 +342,10 @@ app.get('/api/working-girls/search', async (c) => {
   try {
     const searchPattern = `%${query}%`
     const girlsResult = await env.DB.prepare(`
-      SELECT * FROM working_girls 
+      SELECT id, user_id, nickname, age, height, weight, gender, region, 
+             line_id, kakao_id, phone, management_code, agency, conditions, 
+             main_photo, is_active, is_recommended, created_at, updated_at
+      FROM working_girls 
       WHERE (
         nickname LIKE ? OR
         region LIKE ? OR
@@ -381,7 +387,10 @@ app.get('/api/working-girls/:id', async (c) => {
 
   try {
     const girlResult = await env.DB.prepare(`
-      SELECT * FROM working_girls WHERE id = ?
+      SELECT id, user_id, nickname, age, height, weight, gender, region, 
+             line_id, kakao_id, phone, management_code, agency, conditions, 
+             main_photo, is_active, is_recommended, created_at, updated_at
+      FROM working_girls WHERE id = ?
     `).bind(workingGirlId).first()
 
     if (!girlResult) {
@@ -542,7 +551,10 @@ app.post('/api/auth/working-girl/login', async (c) => {
 
   try {
     const user = await env.DB.prepare(`
-      SELECT * FROM working_girls WHERE user_id = ? AND password = ?
+      SELECT id, user_id, nickname, age, height, weight, gender, region, 
+             line_id, kakao_id, phone, management_code, agency, conditions, 
+             main_photo, is_active, is_recommended, created_at, updated_at
+      FROM working_girls WHERE user_id = ? AND password = ?
     `).bind(user_id, password).first()
 
     if (!user) {
@@ -576,7 +588,8 @@ app.post('/api/auth/admin/login', async (c) => {
 
   try {
     const admin = await env.DB.prepare(`
-      SELECT * FROM admins WHERE username = ? AND password = ?
+      SELECT id, username, email, is_active, created_at, updated_at 
+      FROM admins WHERE username = ? AND password = ?
     `).bind(username, password).first()
 
     if (!admin) {
@@ -620,11 +633,15 @@ app.post('/api/auth/verify-session', async (c) => {
     let user
     if (session.user_type === 'working_girl') {
       user = await env.DB.prepare(`
-        SELECT * FROM working_girls WHERE id = ?
+        SELECT id, user_id, nickname, age, height, weight, gender, region, 
+               line_id, kakao_id, phone, management_code, agency, conditions, 
+               main_photo, is_active, is_recommended, created_at, updated_at
+        FROM working_girls WHERE id = ?
       `).bind(session.user_id).first()
     } else if (session.user_type === 'admin') {
       user = await env.DB.prepare(`
-        SELECT * FROM admins WHERE id = ?
+        SELECT id, username, email, is_active, created_at, updated_at
+        FROM admins WHERE id = ?
       `).bind(session.user_id).first()
     }
 
@@ -1468,7 +1485,12 @@ app.put('/api/admin/working-girls/:id', async (c) => {
     const formData = await c.req.formData()
     
     // 워킹걸 존재 확인
-    const existingGirl = await env.DB.prepare(`SELECT * FROM working_girls WHERE id = ?`).bind(workingGirlId).first()
+    const existingGirl = await env.DB.prepare(`
+      SELECT id, user_id, nickname, age, height, weight, gender, region, 
+             line_id, kakao_id, phone, management_code, agency, conditions, 
+             main_photo, is_active, is_recommended, created_at, updated_at
+      FROM working_girls WHERE id = ?
+    `).bind(workingGirlId).first()
     if (!existingGirl) {
       return c.json({ success: false, message: '존재하지 않는 워킹걸입니다.' }, 404)
     }
@@ -1615,7 +1637,9 @@ app.delete('/api/admin/working-girls/:id', async (c) => {
   
   try {
     // 워킹걸 존재 확인
-    const existingGirl = await env.DB.prepare(`SELECT * FROM working_girls WHERE id = ?`).bind(workingGirlId).first()
+    const existingGirl = await env.DB.prepare(`
+      SELECT id, user_id FROM working_girls WHERE id = ?
+    `).bind(workingGirlId).first()
     if (!existingGirl) {
       return c.json({ success: false, message: '존재하지 않는 워킹걸입니다.' }, 404)
     }
@@ -1676,8 +1700,13 @@ app.get('/api/admin/working-girls/:id', async (c) => {
   const workingGirlId = c.req.param('id')
   
   try {
-    // 워킹걸 기본 정보
-    const workingGirl = await env.DB.prepare(`SELECT * FROM working_girls WHERE id = ?`).bind(workingGirlId).first()
+    // 워킹걸 기본 정보 (패스워드 제외)
+    const workingGirl = await env.DB.prepare(`
+      SELECT id, user_id, nickname, age, height, weight, gender, region, 
+             line_id, kakao_id, phone, management_code, agency, conditions, 
+             main_photo, is_active, is_recommended, created_at, updated_at
+      FROM working_girls WHERE id = ?
+    `).bind(workingGirlId).first()
     if (!workingGirl) {
       return c.json({ success: false, message: '존재하지 않는 워킹걸입니다.' }, 404)
     }
