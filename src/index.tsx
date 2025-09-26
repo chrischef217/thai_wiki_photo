@@ -11,6 +11,56 @@ app.use('/api/*', cors())
 // 정적 파일 서빙
 app.use('/static/*', serveStatic({ root: './public' }))
 
+// 관리자 계정 수동 생성 API (임시)
+app.get('/setup-admin', async (c) => {
+  const { env } = c
+  
+  if (!env.DB) {
+    return c.text('데이터베이스 연결 실패', 500)
+  }
+  
+  try {
+    // 관리자 테이블 생성
+    await env.DB.prepare(`
+      CREATE TABLE IF NOT EXISTS admins (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT UNIQUE NOT NULL,
+        password TEXT NOT NULL,
+        email TEXT,
+        is_active BOOLEAN DEFAULT 1,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `).run()
+    
+    // 기존 관리자 삭제 후 새로 생성
+    await env.DB.prepare(`DELETE FROM admins WHERE username = 'admin'`).run()
+    
+    // 관리자 계정 삽입
+    const result = await env.DB.prepare(`
+      INSERT INTO admins (username, password, email, is_active) 
+      VALUES ('admin', '1127', 'admin@thai-wiki.com', 1)
+    `).run()
+    
+    // 확인용 조회
+    const admin = await env.DB.prepare(`
+      SELECT id, username, email, is_active, created_at FROM admins WHERE username = 'admin'
+    `).first()
+    
+    return c.html(`
+      <h1>관리자 계정 설정 완료!</h1>
+      <p>결과: ${JSON.stringify(result, null, 2)}</p>
+      <p>생성된 계정: ${JSON.stringify(admin, null, 2)}</p>
+      <p><strong>아이디: admin</strong></p>
+      <p><strong>비밀번호: 1127</strong></p>
+      <p><a href="/">메인으로 돌아가기</a></p>
+    `)
+    
+  } catch (error) {
+    return c.text(`에러: ${error.message}`, 500)
+  }
+})
+
 // 디버깅 페이지
 app.get('/debug', (c) => {
   return c.html(`
