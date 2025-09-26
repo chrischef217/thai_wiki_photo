@@ -300,23 +300,29 @@ app.get('/api/working-girls', async (c) => {
   const { env } = c
 
   try {
-    const result = await env.DB.prepare(`
-      SELECT 
-        wg.*,
-        GROUP_CONCAT(
-          JSON_OBJECT('id', wp.id, 'photo_url', wp.photo_url, 'is_main', wp.is_main, 'upload_order', wp.upload_order)
-        ) as photos
-      FROM working_girls wg
-      LEFT JOIN working_girl_photos wp ON wg.id = wp.working_girl_id
-      WHERE wg.is_active = 1
-      GROUP BY wg.id
-      ORDER BY wg.is_recommended DESC, wg.created_at DESC
+    // 워킹걸 기본 정보 조회
+    const girlsResult = await env.DB.prepare(`
+      SELECT * FROM working_girls 
+      WHERE is_active = 1 
+      ORDER BY is_recommended DESC, created_at DESC
     `).all()
 
-    const workingGirls = result.results.map(girl => ({
-      ...girl,
-      photos: girl.photos ? JSON.parse(`[${girl.photos}]`) : []
-    }))
+    const workingGirls = []
+    
+    // 각 워킹걸의 사진 정보 별도 조회
+    for (const girl of girlsResult.results) {
+      const photosResult = await env.DB.prepare(`
+        SELECT id, photo_url, is_main, upload_order 
+        FROM working_girl_photos 
+        WHERE working_girl_id = ? 
+        ORDER BY upload_order ASC
+      `).bind(girl.id).all()
+
+      workingGirls.push({
+        ...girl,
+        photos: photosResult.results || []
+      })
+    }
 
     return c.json({ success: true, working_girls: workingGirls })
   } catch (error) {
@@ -332,29 +338,37 @@ app.get('/api/working-girls/search', async (c) => {
 
   try {
     const searchPattern = `%${query}%`
-    const result = await env.DB.prepare(`
-      SELECT 
-        wg.*,
-        GROUP_CONCAT(
-          JSON_OBJECT('id', wp.id, 'photo_url', wp.photo_url, 'is_main', wp.is_main, 'upload_order', wp.upload_order)
-        ) as photos
-      FROM working_girls wg
-      LEFT JOIN working_girl_photos wp ON wg.id = wp.working_girl_id
+    
+    // 워킹걸 기본 정보 검색
+    const girlsResult = await env.DB.prepare(`
+      SELECT * FROM working_girls 
       WHERE (
-        wg.nickname LIKE ? OR
-        wg.region LIKE ? OR
-        wg.gender LIKE ? OR
-        wg.code LIKE ? OR
-        CAST(wg.age AS TEXT) LIKE ?
+        nickname LIKE ? OR
+        region LIKE ? OR
+        gender LIKE ? OR
+        code LIKE ? OR
+        user_id LIKE ? OR
+        CAST(age AS TEXT) LIKE ?
       )
-      GROUP BY wg.id
-      ORDER BY wg.is_recommended DESC, wg.created_at DESC
-    `).bind(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern).all()
+      ORDER BY is_recommended DESC, created_at DESC
+    `).bind(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern).all()
 
-    const workingGirls = result.results.map(girl => ({
-      ...girl,
-      photos: girl.photos ? JSON.parse(`[${girl.photos}]`) : []
-    }))
+    const workingGirls = []
+    
+    // 각 워킹걸의 사진 정보 별도 조회
+    for (const girl of girlsResult.results) {
+      const photosResult = await env.DB.prepare(`
+        SELECT id, photo_url, is_main, upload_order 
+        FROM working_girl_photos 
+        WHERE working_girl_id = ? 
+        ORDER BY upload_order ASC
+      `).bind(girl.id).all()
+
+      workingGirls.push({
+        ...girl,
+        photos: photosResult.results || []
+      })
+    }
 
     return c.json({ success: true, working_girls: workingGirls })
   } catch (error) {

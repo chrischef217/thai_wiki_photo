@@ -177,7 +177,26 @@ function displayWorkingGirls(workingGirls) {
     noData.classList.add('hidden');
 
     const cardsHTML = workingGirls.map(girl => {
-        const mainPhoto = girl.main_photo || '/static/images/default-avatar.jpg';
+        // 실제 업로드된 사진 중 첫 번째 사진 또는 메인 사진 찾기
+        let mainPhoto = '/static/images/default-avatar.jpg';
+        
+        if (girl.photos && girl.photos.length > 0) {
+            // is_main이 1인 사진 찾기
+            const mainPhotoObj = girl.photos.find(photo => photo.is_main === 1);
+            if (mainPhotoObj && mainPhotoObj.photo_url) {
+                mainPhoto = mainPhotoObj.photo_url;
+            } else {
+                // is_main이 없으면 첫 번째 사진 사용
+                const firstPhoto = girl.photos[0];
+                if (firstPhoto && firstPhoto.photo_url) {
+                    mainPhoto = firstPhoto.photo_url;
+                }
+            }
+        } else if (girl.main_photo) {
+            // 기존 main_photo 필드가 있으면 사용 (호환성)
+            mainPhoto = girl.main_photo;
+        }
+        
         const recommendedBadge = girl.is_recommended ? 
             '<div class="absolute top-2 left-2 bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-2 py-1 rounded-full text-xs font-bold recommended-badge"><i class="fas fa-star mr-1"></i>추천</div>' : '';
         
@@ -243,7 +262,7 @@ function showWorkingGirlModal(girl) {
     // 실제로 유효한 사진만 필터링 (Base64 데이터와 URL 모두 지원)
     const validPhotos = girl.photos ? girl.photos.filter(photo => 
         photo && photo.photo_url && photo.photo_url.trim() !== '' && 
-        (photo.photo_url.startsWith('data:') || photo.photo_url.startsWith('http'))
+        (photo.photo_url.startsWith('data:') || photo.photo_url.startsWith('http') || photo.photo_url.startsWith('/static/'))
     ) : [];
     
     console.log('유효한 사진 개수:', validPhotos.length);
