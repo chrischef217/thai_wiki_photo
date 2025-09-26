@@ -405,10 +405,76 @@ function showWorkingGirlModal(girl) {
     document.getElementById('modal-container').innerHTML = modalHTML;
 }
 
-// 만남 요청 (준비만 해두고 나중에 링크 연결)
+// 만남 요청 - 텔레그램 전송
 function requestMeeting(workingGirlId) {
-    // 향후 만남 요청 링크로 이동할 준비
-    showNotification('만남 요청 기능은 준비 중입니다.', 'info');
+    // 텔레그램 정보 입력 모달 표시
+    const modalHTML = `
+        <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-[55] modal-overlay" onclick="closeMeetingModal(event)">
+            <div class="bg-white rounded-lg max-w-md w-full mx-4 modal-content" onclick="event.stopPropagation()">
+                <div class="p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-xl font-bold text-gray-800">만남 요청</h3>
+                        <button onclick="closeMeetingModal()" class="text-gray-600 hover:text-gray-800 text-2xl">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    
+                    <form onsubmit="submitMeetingRequest(event, ${workingGirlId})">
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">요청자 이름 *</label>
+                            <input type="text" id="meeting-user-name" required 
+                                   placeholder="예: 김철수"
+                                   class="w-full p-3 border border-gray-300 rounded-lg focus:border-thai-red focus:outline-none">
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">텔레그램 아이디 *</label>
+                            <input type="text" id="meeting-telegram" required 
+                                   placeholder="예: @username 또는 username"
+                                   class="w-full p-3 border border-gray-300 rounded-lg focus:border-thai-red focus:outline-none">
+                            <p class="text-sm text-gray-500 mt-1">@ 기호는 입력하지 않으셔도 됩니다.</p>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">현재 위치</label>
+                            <div class="flex space-x-2">
+                                <button type="button" onclick="getCurrentLocation()" 
+                                        class="flex-1 bg-blue-500 hover:bg-blue-600 text-white py-2 px-3 rounded-lg font-medium transition-colors duration-200">
+                                    <i class="fas fa-map-marker-alt mr-2"></i>위치 확인
+                                </button>
+                                <div id="location-status" class="flex-2 p-2 text-sm text-gray-600">
+                                    위치를 확인해주세요
+                                </div>
+                            </div>
+                            <input type="hidden" id="user-location" value="">
+                        </div>
+                        
+                        <div class="mb-6">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">추가 메시지 (선택)</label>
+                            <textarea id="meeting-message" rows="3" 
+                                      placeholder="간단한 인사나 요청 사항을 입력해주세요..."
+                                      class="w-full p-3 border border-gray-300 rounded-lg focus:border-thai-red focus:outline-none resize-vertical"></textarea>
+                        </div>
+                        
+                        <div class="flex space-x-3">
+                            <button type="button" onclick="closeMeetingModal()" 
+                                    class="flex-1 bg-gray-500 hover:bg-gray-600 text-white py-3 rounded-lg font-medium transition-colors duration-200">
+                                취소
+                            </button>
+                            <button type="submit" 
+                                    class="flex-1 bg-thai-red hover:bg-red-600 text-white py-3 rounded-lg font-medium transition-colors duration-200">
+                                <i class="fas fa-paper-plane mr-2"></i>요청 전송
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // 기존 모달 컨테이너에 추가
+    const existingModal = document.getElementById('modal-container');
+    existingModal.insertAdjacentHTML('beforeend', modalHTML);
 }
 
 // 모달 닫기
@@ -1279,3 +1345,131 @@ window.openPhotoLightbox = function(photoUrl, nickname) {
     console.log('라이트박스 열기:', photoUrl, nickname);
     showPhotoLightbox(photoUrl, nickname);
 };
+
+// 만남 요청 모달 닫기
+function closeMeetingModal(event) {
+    if (event && event.target !== event.currentTarget) return;
+    
+    // z-index가 55인 만남 요청 모달만 찾아서 제거
+    const meetingModal = document.querySelector('.modal-overlay[style*="z-index: 55"], .z-\\[55\\]');
+    if (meetingModal) {
+        meetingModal.remove();
+    }
+}
+
+// 현재 위치 확인 함수
+async function getCurrentLocation() {
+    const locationStatus = document.getElementById('location-status');
+    const locationInput = document.getElementById('user-location');
+    
+    if (!navigator.geolocation) {
+        locationStatus.innerHTML = '<span class="text-red-500">위치 서비스를 지원하지 않습니다</span>';
+        return;
+    }
+    
+    locationStatus.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>위치 확인 중...';
+    
+    try {
+        const position = await new Promise((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(
+                resolve,
+                reject,
+                { 
+                    enableHighAccuracy: true, 
+                    timeout: 10000, 
+                    maximumAge: 300000 
+                }
+            );
+        });
+        
+        const { latitude, longitude } = position.coords;
+        const googleMapsUrl = `https://maps.google.com/?q=${latitude},${longitude}`;
+        
+        // 역지오코딩으로 주소 확인 (선택사항)
+        try {
+            const response = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=ko`);
+            const locationData = await response.json();
+            const address = locationData.locality || locationData.city || '주소 확인 불가';
+            
+            locationStatus.innerHTML = `<span class="text-green-600"><i class="fas fa-check mr-1"></i>${address}</span>`;
+        } catch (e) {
+            locationStatus.innerHTML = `<span class="text-green-600"><i class="fas fa-check mr-1"></i>위치 확인됨</span>`;
+        }
+        
+        locationInput.value = googleMapsUrl;
+        
+    } catch (error) {
+        console.error('위치 확인 오류:', error);
+        let errorMessage = '위치 확인 실패';
+        
+        if (error.code === 1) {
+            errorMessage = '위치 접근이 거부되었습니다';
+        } else if (error.code === 2) {
+            errorMessage = '위치를 확인할 수 없습니다';
+        } else if (error.code === 3) {
+            errorMessage = '위치 확인 시간 초과';
+        }
+        
+        locationStatus.innerHTML = `<span class="text-red-500"><i class="fas fa-exclamation-triangle mr-1"></i>${errorMessage}</span>`;
+    }
+}
+
+// 만남 요청 전송
+async function submitMeetingRequest(event, workingGirlId) {
+    event.preventDefault();
+    
+    try {
+        // 입력값 가져오기
+        const userName = document.getElementById('meeting-user-name').value.trim();
+        const userTelegram = document.getElementById('meeting-telegram').value.trim().replace('@', ''); // @ 제거
+        const message = document.getElementById('meeting-message').value.trim();
+        const userLocation = document.getElementById('user-location').value.trim();
+        
+        if (!userName || !userTelegram) {
+            showNotification('이름과 텔레그램 아이디는 필수입니다.', 'warning');
+            return;
+        }
+        
+        // 로딩 상태 표시
+        const submitBtn = event.target.querySelector('button[type="submit"]');
+        const originalText = submitBtn.innerHTML;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>전송 중...';
+        submitBtn.disabled = true;
+        
+        console.log('만남 요청 데이터:', {
+            working_girl_id: workingGirlId,
+            user_name: userName,
+            user_telegram: userTelegram,
+            user_location: userLocation,
+            message: message
+        });
+        
+        // API 호출
+        const response = await axios.post('/api/meeting-request', {
+            working_girl_id: workingGirlId,
+            user_name: userName,
+            user_telegram: userTelegram,
+            user_location: userLocation,
+            message: message
+        });
+        
+        if (response.data.success) {
+            showNotification('만남 요청이 전송되었습니다! 관리자가 확인 후 연락드립니다.', 'success');
+            closeMeetingModal();
+        } else {
+            showNotification(response.data.message || '요청 전송에 실패했습니다.', 'error');
+        }
+        
+    } catch (error) {
+        console.error('만남 요청 전송 오류:', error);
+        const errorMessage = error.response?.data?.message || '네트워크 오류가 발생했습니다.';
+        showNotification(errorMessage, 'error');
+    } finally {
+        // 버튼 상태 복원
+        const submitBtn = event.target.querySelector('button[type="submit"]');
+        if (submitBtn) {
+            submitBtn.innerHTML = originalText;
+            submitBtn.disabled = false;
+        }
+    }
+}

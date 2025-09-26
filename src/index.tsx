@@ -177,6 +177,7 @@ app.get('/debug', (c) => {
 // 메인 페이지
 app.get('/', async (c) => {
   const { env } = c
+  const timestamp = Date.now()
 
   // 데이터베이스 테이블 초기화 (로컬 개발용)
   if (env.DB) {
@@ -2048,6 +2049,163 @@ app.put('/api/admin/advertisements/:id', async (c) => {
   }
 })
 
+// 만남요청 텔레그램 전송 API
+app.post('/api/meeting-request', async (c) => {
+  const { env } = c
+  
+  try {
+    const { 
+      working_girl_id, 
+      user_telegram, 
+      user_name, 
+      user_location,
+      message 
+    } = await c.req.json()
+
+    // 워킹걸 정보 조회 (확장된 정보)
+    const workingGirl = await env.DB.prepare(`
+      SELECT user_id, nickname, age, height, weight, gender, region, 
+             management_code, agency, is_active
+      FROM working_girls WHERE id = ?
+    `).bind(working_girl_id).first()
+
+    if (!workingGirl) {
+      return c.json({ success: false, message: '존재하지 않는 프로필입니다.' }, 404)
+    }
+
+    // 대표 사진 조회 (메인 사진 또는 첫 번째 사진)
+    const mainPhoto = await env.DB.prepare(`
+      SELECT photo_url FROM working_girl_photos 
+      WHERE working_girl_id = ? 
+      ORDER BY is_main DESC, upload_order ASC 
+      LIMIT 1
+    `).bind(working_girl_id).first()
+
+    // 텔레그램 봇 토큰과 채널 ID (환경변수 또는 설정)
+    const TELEGRAM_BOT_TOKEN = env.TELEGRAM_BOT_TOKEN || '여기에_봇_토큰_입력'
+    const TELEGRAM_CHANNEL_ID = env.TELEGRAM_ADMIN_CHAT_ID || '여기에_채널_ID_입력'
+    
+    // 텔레그램 메시지 내용 구성
+    const telegramMessage = `
+🔔 **새로운 만남 요청**
+
+👤 **요청자 정보:**
+• 이름: ${user_name || '미입력'}
+• 텔레그램: @${user_telegram}
+${user_location ? `• 현재위치: ${user_location}` : ''}
+
+👩 **워킹걸 정보:**
+• 에이전시: ${workingGirl.agency || '미등록'}
+• 관리코드: ${workingGirl.management_code || '없음'}
+• 거주지역: ${workingGirl.region}
+• 아이디: ${workingGirl.user_id}
+• 닉네임: ${workingGirl.nickname}
+• 나이: ${workingGirl.age}세
+• 키: ${workingGirl.height}cm
+• 몸무게: ${workingGirl.weight}kg
+• 성별: ${workingGirl.gender}
+• 상태: ${workingGirl.is_active ? '활성' : '비활성'}
+
+💬 **요청 메시지:**
+${message || '메시지 없음'}
+
+⏰ **요청 시간:** ${new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}
+    `.trim()
+
+    // 환경변수 확인
+    if (!TELEGRAM_BOT_TOKEN || TELEGRAM_BOT_TOKEN === '여기에_봇_토큰_입력') {
+      console.error('TELEGRAM_BOT_TOKEN not configured')
+      return c.json({ 
+        success: false, 
+        message: '텔레그램 봇 설정이 필요합니다.' 
+      }, 500)
+    }
+    
+    if (!TELEGRAM_CHANNEL_ID || TELEGRAM_CHANNEL_ID === '여기에_채널_ID_입력') {
+      console.error('TELEGRAM_ADMIN_CHAT_ID not configured')
+      return c.json({ 
+        success: false, 
+        message: '텔레그램 채널 설정이 필요합니다.' 
+      }, 500)
+    }
+
+    console.log('Sending message to Telegram:', { 
+      chatId: TELEGRAM_CHANNEL_ID,
+      messageLength: telegramMessage.length,
+      hasPhoto: !!mainPhoto
+    })
+
+    let telegramResponse, responseData
+
+    // 대표 사진이 있으면 사진과 함께 전송, 없으면 텍스트만 전송
+    if (mainPhoto && mainPhoto.photo_url && mainPhoto.photo_url.startsWith('data:image/')) {
+      // Base64 이미지를 바이너리로 변환 (파일 업로드용)
+      const base64Data = mainPhoto.photo_url.split(',')[1]
+      const imageBuffer = Buffer.from(base64Data, 'base64')
+      
+      // FormData를 사용해 이미지와 캡션 전송
+      const formData = new FormData()
+      formData.append('chat_id', TELEGRAM_CHANNEL_ID)
+      formData.append('caption', telegramMessage)
+      formData.append('parse_mode', 'Markdown')
+      formData.append('photo', new Blob([imageBuffer], { type: 'image/jpeg' }), 'photo.jpg')
+      
+      telegramResponse = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendPhoto`, {
+        method: 'POST',
+        body: formData
+      })
+    } else {
+      // 사진이 없거나 Base64가 아닌 경우 텍스트만 전송
+      telegramResponse = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          chat_id: TELEGRAM_CHANNEL_ID,
+          text: telegramMessage,
+          parse_mode: 'Markdown'
+        })
+      })
+    }
+
+    responseData = await telegramResponse.json()
+    console.log('Telegram API response:', responseData)
+
+    if (!telegramResponse.ok) {
+      console.error('Telegram API error:', responseData)
+      return c.json({ 
+        success: false, 
+        message: `텔레그램 전송 실패: ${responseData.description || '알 수 없는 오류'}` 
+      }, 500)
+    }
+
+    // 만남요청 기록 저장 (옵션)
+    try {
+      await env.DB.prepare(`
+        INSERT INTO meeting_requests (
+          working_girl_id, user_telegram, user_name, message, created_at
+        ) VALUES (?, ?, ?, ?, datetime('now'))
+      `).bind(working_girl_id, user_telegram, user_name || '', message || '').run()
+    } catch (dbError) {
+      // 테이블이 없을 수 있으므로 에러 무시
+      console.log('Meeting request log table not found, skipping...')
+    }
+
+    return c.json({ 
+      success: true, 
+      message: '만남 요청이 관리자에게 전송되었습니다!' 
+    })
+
+  } catch (error) {
+    console.error('Meeting request error:', error)
+    return c.json({ 
+      success: false, 
+      message: '만남 요청 전송 중 오류가 발생했습니다.' 
+    }, 500)
+  }
+})
+
 // 광고 활성화/비활성화 토글 API
 app.put('/api/admin/advertisements/:id/toggle', async (c) => {
   const { env } = c
@@ -2094,6 +2252,149 @@ app.delete('/api/admin/advertisements/cleanup', async (c) => {
   } catch (error) {
     console.error('Advertisement cleanup error:', error)
     return c.json({ success: false, message: '광고 정리 중 오류가 발생했습니다.' }, 500)
+  }
+})
+
+// 텔레그램 채널 ID 확인용 도구 API
+app.get('/telegram-test', async (c) => {
+  const { env } = c
+  
+  const botToken = env.TELEGRAM_BOT_TOKEN
+  
+  if (!botToken) {
+    return c.html(`
+      <div style="font-family: Arial, sans-serif; max-width: 800px; margin: 50px auto; padding: 20px;">
+        <h1>🤖 텔레그램 봇 설정</h1>
+        <div style="background: #f44336; color: white; padding: 15px; border-radius: 8px;">
+          <strong>❌ 봇 토큰이 설정되지 않았습니다!</strong><br>
+          <code>.dev.vars</code> 파일에 <code>TELEGRAM_BOT_TOKEN</code>을 추가해주세요.
+        </div>
+      </div>
+    `)
+  }
+  
+  return c.html(`
+    <div style="font-family: Arial, sans-serif; max-width: 800px; margin: 50px auto; padding: 20px;">
+      <h1>🤖 텔레그램 채널 ID 확인 도구</h1>
+      
+      <div style="background: #e3f2fd; padding: 15px; border-radius: 8px; margin: 20px 0;">
+        <h3>📋 단계별 안내</h3>
+        <ol>
+          <li><strong>봇을 채널에 추가</strong>: 채널 → 관리자 → 봇을 관리자로 추가</li>
+          <li><strong>채널에 메시지 전송</strong>: 아무 메시지나 전송 (예: "테스트")</li>
+          <li><strong>아래 버튼 클릭</strong>해서 채널 ID 확인</li>
+        </ol>
+      </div>
+      
+      <button onclick="getChannelId()" style="background: #2196F3; color: white; padding: 15px 30px; border: none; border-radius: 8px; font-size: 16px; cursor: pointer;">
+        🔍 채널 ID 확인하기
+      </button>
+      
+      <div id="result" style="margin-top: 20px;"></div>
+      
+      <script>
+        async function getChannelId() {
+          const resultDiv = document.getElementById('result');
+          resultDiv.innerHTML = '<div style="background: #fff3cd; padding: 15px; border-radius: 8px;">⏳ 확인 중...</div>';
+          
+          try {
+            const response = await fetch('/api/telegram/get-updates');
+            const data = await response.json();
+            
+            if (data.success && data.updates.length > 0) {
+              let channelsFound = [];
+              
+              data.updates.forEach(update => {
+                if (update.channel_post || update.my_chat_member) {
+                  const chat = update.channel_post?.chat || update.my_chat_member?.chat;
+                  if (chat && chat.type === 'channel') {
+                    channelsFound.push({
+                      id: chat.id,
+                      title: chat.title,
+                      username: chat.username
+                    });
+                  }
+                }
+              });
+              
+              if (channelsFound.length > 0) {
+                let html = '<div style="background: #d4edda; padding: 15px; border-radius: 8px;"><h3>✅ 채널 ID 발견!</h3>';
+                
+                channelsFound.forEach(channel => {
+                  html += \`
+                    <div style="background: white; padding: 10px; margin: 10px 0; border-radius: 5px; border-left: 4px solid #28a745;">
+                      <strong>채널명:</strong> \${channel.title}<br>
+                      <strong>채널 ID:</strong> <code style="background: #f8f9fa; padding: 2px 5px; color: #e83e8c;">\${channel.id}</code><br>
+                      \${channel.username ? \`<strong>사용자명:</strong> @\${channel.username}<br>\` : ''}
+                      <small>이 ID를 .dev.vars 파일의 TELEGRAM_ADMIN_CHAT_ID에 설정하세요</small>
+                    </div>
+                  \`;
+                });
+                
+                html += '</div>';
+                resultDiv.innerHTML = html;
+              } else {
+                resultDiv.innerHTML = \`
+                  <div style="background: #f8d7da; padding: 15px; border-radius: 8px;">
+                    <strong>⚠️ 채널을 찾을 수 없습니다</strong><br>
+                    1. 봇이 채널에 관리자로 추가되었는지 확인<br>
+                    2. 채널에 최근 메시지가 있는지 확인<br>
+                    3. 봇 토큰이 올바른지 확인
+                  </div>
+                \`;
+              }
+            } else {
+              resultDiv.innerHTML = \`
+                <div style="background: #f8d7da; padding: 15px; border-radius: 8px;">
+                  <strong>❌ 업데이트를 가져올 수 없습니다</strong><br>
+                  봇 토큰을 확인하거나 채널에 메시지를 전송해보세요.
+                </div>
+              \`;
+            }
+          } catch (error) {
+            resultDiv.innerHTML = \`
+              <div style="background: #f8d7da; padding: 15px; border-radius: 8px;">
+                <strong>❌ 오류 발생:</strong> \${error.message}
+              </div>
+            \`;
+          }
+        }
+      </script>
+      
+      <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-top: 30px;">
+        <h3>💡 문제 해결</h3>
+        <p><strong>채널이 안 보인다면?</strong></p>
+        <ul>
+          <li>봇이 채널 관리자로 추가되었는지 확인</li>
+          <li>채널에 봇 추가 후 아무 메시지나 전송</li>
+          <li>채널이 아닌 그룹인지 확인 (그룹 ID는 다른 형태)</li>
+        </ul>
+      </div>
+    </div>
+  `)
+})
+
+// 텔레그램 getUpdates API 호출
+app.get('/api/telegram/get-updates', async (c) => {
+  const { env } = c
+  
+  const botToken = env.TELEGRAM_BOT_TOKEN
+  
+  if (!botToken) {
+    return c.json({ success: false, message: '봇 토큰이 설정되지 않았습니다.' })
+  }
+  
+  try {
+    const response = await fetch(`https://api.telegram.org/bot${botToken}/getUpdates`)
+    const data = await response.json()
+    
+    if (data.ok) {
+      return c.json({ success: true, updates: data.result })
+    } else {
+      return c.json({ success: false, message: data.description })
+    }
+  } catch (error) {
+    return c.json({ success: false, message: error.message })
   }
 })
 
