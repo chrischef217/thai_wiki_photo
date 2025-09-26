@@ -201,6 +201,10 @@ function displayWorkingGirls(workingGirls) {
                     <div class="space-y-1 text-sm text-gray-600">
                         <p><i class="fas fa-venus mr-2 text-pink-500"></i>${girl.gender}</p>
                         <p><i class="fas fa-map-marker-alt mr-2 text-red-500"></i>${girl.region}</p>
+                        ${girl.age ? `<p><i class="fas fa-birthday-cake mr-2 text-blue-500"></i>${girl.age}세</p>` : ''}
+                        ${girl.height && girl.weight ? `<p><i class="fas fa-ruler-vertical mr-2 text-green-500"></i>${girl.height}cm / ${girl.weight}kg</p>` : 
+                          girl.height ? `<p><i class="fas fa-ruler-vertical mr-2 text-green-500"></i>${girl.height}cm</p>` : 
+                          girl.weight ? `<p><i class="fas fa-weight mr-2 text-green-500"></i>${girl.weight}kg</p>` : ''}
                     </div>
                 </div>
             </div>
@@ -293,44 +297,75 @@ function showWorkingGirlModal(girl) {
                     `}
 
                     <!-- 기본 정보 -->
-                    <div class="grid grid-cols-2 gap-4 mb-6">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700">나이</label>
-                            <p class="mt-1 text-lg">${girl.age}세</p>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <h4 class="font-semibold text-gray-800 mb-3">기본 정보</h4>
+                            <div class="space-y-2 text-sm">
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">아이디:</span>
+                                    <span class="font-medium">${girl.username || '미입력'}</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">닉네임:</span>
+                                    <span class="font-medium">${girl.nickname || '미입력'}</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">나이:</span>
+                                    <span class="font-medium">${girl.age ? girl.age + '세' : '미입력'}</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">성별:</span>
+                                    <span class="font-medium">${
+                                        girl.gender === 'female' ? '여성' :
+                                        girl.gender === 'male' ? '남성' :
+                                        girl.gender === 'trans' ? '트랜스젠더' :
+                                        girl.gender || '미입력'
+                                    }</span>
+                                </div>
+                            </div>
                         </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700">성별</label>
-                            <p class="mt-1 text-lg">${girl.gender}</p>
+                        
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <h4 class="font-semibold text-gray-800 mb-3">신체 정보</h4>
+                            <div class="space-y-2 text-sm">
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">키:</span>
+                                    <span class="font-medium">${girl.height ? girl.height + 'cm' : '미입력'}</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">몸무게:</span>
+                                    <span class="font-medium">${girl.weight ? girl.weight + 'kg' : '미입력'}</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">지역:</span>
+                                    <span class="font-medium">${girl.region || '미입력'}</span>
+                                </div>
+                                ${girl.is_recommended ? `
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">추천:</span>
+                                    <span class="font-medium text-yellow-600">
+                                        <i class="fas fa-star"></i> 추천 워킹걸
+                                    </span>
+                                </div>
+                                ` : ''}
+                            </div>
                         </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700">키</label>
-                            <p class="mt-1 text-lg">${girl.height}cm</p>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700">몸무게</label>
-                            <p class="mt-1 text-lg">${girl.weight}kg</p>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700">거주 지역</label>
-                            <p class="mt-1 text-lg">${girl.region}</p>
-                        </div>
-                        ${girl.code ? `
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700">코드</label>
-                            <p class="mt-1 text-lg font-bold text-thai-red">${girl.code}</p>
-                        </div>
-                        ` : ''}
                     </div>
 
-                    <!-- 조건 정보 -->
-                    ${girl.conditions ? `
-                    <div class="mb-4">
-                        <label class="block text-sm font-medium text-gray-700 mb-2">조건</label>
-                        <div class="bg-gray-50 p-3 rounded-lg">
-                            <p class="text-gray-800 whitespace-pre-wrap">${girl.conditions}</p>
+                    <!-- 활동 상태 정보 -->
+                    <div class="mb-6">
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <h4 class="font-semibold text-gray-800 mb-3">상태 정보</h4>
+                            <div class="flex items-center justify-between">
+                                <span class="text-gray-600">활동 상태:</span>
+                                <span class="px-3 py-1 rounded-full text-sm font-medium ${
+                                    girl.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                                }">
+                                    ${girl.is_active ? '활성' : '비활성'}
+                                </span>
+                            </div>
                         </div>
                     </div>
-                    ` : ''}
 
                     <!-- 만남 요청 버튼 -->
                     <div class="mt-6 text-center">

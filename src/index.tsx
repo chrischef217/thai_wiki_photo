@@ -218,9 +218,6 @@ app.get('/', async (c) => {
                 </div>
                 
                 <nav class="space-y-4">
-                    <a href="#" onclick="showWorkingGirlLogin()" class="block p-3 bg-thai-red text-white rounded-lg hover:bg-red-600 transition-colors duration-200">
-                        <i class="fas fa-user mr-2"></i>워킹걸 로그인
-                    </a>
                     <a href="#" onclick="showAdminLogin()" class="block p-3 bg-thai-blue text-white rounded-lg hover:bg-blue-700 transition-colors duration-200">
                         <i class="fas fa-cog mr-2"></i>관리자 로그인
                     </a>
@@ -1017,8 +1014,12 @@ app.get('/admin', async (c) => {
 
               <!-- 워킹걸 관리 테이블 -->
               <div class="bg-white rounded-lg shadow-md overflow-hidden">
-                  <div class="p-6 border-b">
+                  <div class="p-6 border-b flex justify-between items-center">
                       <h2 class="text-xl font-bold">워킹걸 관리</h2>
+                      <button onclick="showAddWorkingGirlModal()" 
+                              class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg">
+                          <i class="fas fa-plus mr-2"></i>새 워킹걸 등록
+                      </button>
                   </div>
                   <div class="overflow-x-auto">
                       <table class="w-full">
@@ -1033,6 +1034,7 @@ app.get('/admin', async (c) => {
                                   <th class="px-4 py-3 text-left">키</th>
                                   <th class="px-4 py-3 text-left">몸무게</th>
                                   <th class="px-4 py-3 text-left">성별</th>
+                                  <th class="px-4 py-3 text-left">상태</th>
                                   <th class="px-4 py-3 text-left">관리</th>
                               </tr>
                           </thead>
@@ -1040,6 +1042,159 @@ app.get('/admin', async (c) => {
                               <!-- 동적으로 로드됩니다 -->
                           </tbody>
                       </table>
+                  </div>
+              </div>
+
+              <!-- 워킹걸 등록/수정 모달 -->
+              <div id="workingGirlModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50">
+                  <div class="flex items-center justify-center min-h-screen p-4">
+                      <div class="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-screen overflow-y-auto">
+                          <div class="p-6 border-b">
+                              <div class="flex justify-between items-center">
+                                  <h3 id="modalTitle" class="text-xl font-bold">새 워킹걸 등록</h3>
+                                  <button onclick="closeWorkingGirlModal()" class="text-gray-500 hover:text-gray-700">
+                                      <i class="fas fa-times text-xl"></i>
+                                  </button>
+                              </div>
+                          </div>
+                          
+                          <form id="workingGirlForm" class="p-6 space-y-6">
+                              <input type="hidden" id="editingWorkingGirlId" value="">
+                              
+                              <!-- 기본 정보 섹션 -->
+                              <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                  <div>
+                                      <label class="block text-sm font-medium mb-2">아이디 *</label>
+                                      <input type="text" id="wg_username" name="username" required
+                                             class="w-full p-3 border border-gray-300 rounded-lg focus:border-thai-blue focus:outline-none">
+                                  </div>
+                                  <div>
+                                      <label class="block text-sm font-medium mb-2">닉네임 *</label>
+                                      <input type="text" id="wg_nickname" name="nickname" required
+                                             class="w-full p-3 border border-gray-300 rounded-lg focus:border-thai-blue focus:outline-none">
+                                  </div>
+                                  <div>
+                                      <label class="block text-sm font-medium mb-2">나이</label>
+                                      <input type="number" id="wg_age" name="age" min="18" max="60"
+                                             class="w-full p-3 border border-gray-300 rounded-lg focus:border-thai-blue focus:outline-none">
+                                  </div>
+                                  <div>
+                                      <label class="block text-sm font-medium mb-2">성별</label>
+                                      <select id="wg_gender" name="gender"
+                                              class="w-full p-3 border border-gray-300 rounded-lg focus:border-thai-blue focus:outline-none">
+                                          <option value="female">여성</option>
+                                          <option value="male">남성</option>
+                                          <option value="trans">트랜스젠더</option>
+                                      </select>
+                                  </div>
+                                  <div>
+                                      <label class="block text-sm font-medium mb-2">키 (cm)</label>
+                                      <input type="number" id="wg_height" name="height" min="140" max="200"
+                                             class="w-full p-3 border border-gray-300 rounded-lg focus:border-thai-blue focus:outline-none">
+                                  </div>
+                                  <div>
+                                      <label class="block text-sm font-medium mb-2">몸무게 (kg)</label>
+                                      <input type="number" id="wg_weight" name="weight" min="40" max="120"
+                                             class="w-full p-3 border border-gray-300 rounded-lg focus:border-thai-blue focus:outline-none">
+                                  </div>
+                                  <div>
+                                      <label class="block text-sm font-medium mb-2">지역 *</label>
+                                      <select id="wg_region" name="region" required
+                                              class="w-full p-3 border border-gray-300 rounded-lg focus:border-thai-blue focus:outline-none">
+                                          <option value="">지역 선택</option>
+                                          <option value="방콕">방콕</option>
+                                          <option value="파타야">파타야</option>
+                                          <option value="치앙마이">치앙마이</option>
+                                          <option value="푸켓">푸켓</option>
+                                          <option value="기타">기타</option>
+                                      </select>
+                                  </div>
+                              </div>
+
+                              <!-- 연락처 정보 섹션 -->
+                              <div class="border-t pt-6">
+                                  <h4 class="text-lg font-medium mb-4">연락처 정보</h4>
+                                  <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                      <div>
+                                          <label class="block text-sm font-medium mb-2">전화번호</label>
+                                          <input type="text" id="wg_phone" name="phone"
+                                                 class="w-full p-3 border border-gray-300 rounded-lg focus:border-thai-blue focus:outline-none">
+                                      </div>
+                                      <div>
+                                          <label class="block text-sm font-medium mb-2">라인 ID</label>
+                                          <input type="text" id="wg_line_id" name="line_id"
+                                                 class="w-full p-3 border border-gray-300 rounded-lg focus:border-thai-blue focus:outline-none">
+                                      </div>
+                                      <div>
+                                          <label class="block text-sm font-medium mb-2">위챗 ID</label>
+                                          <input type="text" id="wg_wechat_id" name="wechat_id"
+                                                 class="w-full p-3 border border-gray-300 rounded-lg focus:border-thai-blue focus:outline-none">
+                                      </div>
+                                  </div>
+                              </div>
+
+                              <!-- 설정 섹션 -->
+                              <div class="border-t pt-6">
+                                  <h4 class="text-lg font-medium mb-4">설정</h4>
+                                  <div class="flex space-x-6">
+                                      <label class="flex items-center space-x-2">
+                                          <input type="checkbox" id="wg_is_recommended" name="is_recommended"
+                                                 class="w-4 h-4 text-thai-blue border-gray-300 rounded focus:ring-thai-blue">
+                                          <span>추천 워킹걸</span>
+                                      </label>
+                                      <label class="flex items-center space-x-2">
+                                          <input type="checkbox" id="wg_is_active" name="is_active" checked
+                                                 class="w-4 h-4 text-thai-blue border-gray-300 rounded focus:ring-thai-blue">
+                                          <span>활성 상태</span>
+                                      </label>
+                                  </div>
+                              </div>
+
+                              <!-- 사진 관리 섹션 -->
+                              <div class="border-t pt-6">
+                                  <h4 class="text-lg font-medium mb-4">사진 관리</h4>
+                                  
+                                  <!-- 기존 사진 (수정 모드에서만 표시) -->
+                                  <div id="existingPhotosSection" class="hidden mb-6">
+                                      <h5 class="text-md font-medium mb-3">기존 사진</h5>
+                                      <div id="existingPhotosList" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                                          <!-- 기존 사진들이 여기에 표시됩니다 -->
+                                      </div>
+                                  </div>
+                                  
+                                  <!-- 새 사진 업로드 -->
+                                  <div>
+                                      <h5 class="text-md font-medium mb-3">새 사진 추가</h5>
+                                      <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                                          <input type="file" id="photoFiles" multiple accept="image/*" 
+                                                 class="hidden" onchange="previewNewPhotos(this)">
+                                          <button type="button" onclick="document.getElementById('photoFiles').click()"
+                                                  class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg">
+                                              <i class="fas fa-camera mr-2"></i>사진 선택 (여러장 가능)
+                                          </button>
+                                          <p class="text-sm text-gray-500 mt-2">JPG, PNG 파일만 업로드 가능</p>
+                                      </div>
+                                      
+                                      <!-- 새 사진 미리보기 -->
+                                      <div id="newPhotosPreview" class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+                                          <!-- 새 사진 미리보기가 여기에 표시됩니다 -->
+                                      </div>
+                                  </div>
+                              </div>
+
+                              <!-- 버튼 섹션 -->
+                              <div class="border-t pt-6 flex justify-end space-x-4">
+                                  <button type="button" onclick="closeWorkingGirlModal()"
+                                          class="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
+                                      취소
+                                  </button>
+                                  <button type="submit" id="submitBtn"
+                                          class="px-6 py-2 bg-thai-blue hover:bg-blue-700 text-white rounded-lg">
+                                      <i class="fas fa-save mr-2"></i>저장
+                                  </button>
+                              </div>
+                          </form>
+                      </div>
                   </div>
               </div>
 
@@ -1071,6 +1226,304 @@ app.get('/admin', async (c) => {
   } catch (error) {
     console.error('Admin page error:', error)
     return c.text('Internal Server Error', 500)
+  }
+})
+
+// 관리자용 워킹걸 등록 API
+app.post('/api/admin/working-girls', async (c) => {
+  const { env } = c
+  
+  try {
+    const formData = await c.req.formData()
+    
+    // 필수 필드 검증
+    const username = formData.get('username')?.toString()
+    const nickname = formData.get('nickname')?.toString()
+    const region = formData.get('region')?.toString()
+    
+    if (!username || !nickname || !region) {
+      return c.json({ success: false, message: '필수 정보가 누락되었습니다.' }, 400)
+    }
+
+    // 중복 아이디 체크
+    const existingUser = await env.DB.prepare(`SELECT id FROM working_girls WHERE username = ?`).bind(username).first()
+    if (existingUser) {
+      return c.json({ success: false, message: '이미 존재하는 아이디입니다.' }, 400)
+    }
+
+    // 워킹걸 데이터 삽입
+    const workingGirlData = {
+      username,
+      nickname,
+      age: parseInt(formData.get('age')?.toString() || '0'),
+      height: parseInt(formData.get('height')?.toString() || '0'),
+      weight: parseInt(formData.get('weight')?.toString() || '0'),
+      gender: formData.get('gender')?.toString() || 'female',
+      region,
+      phone: formData.get('phone')?.toString() || '',
+      line_id: formData.get('line_id')?.toString() || '',
+      wechat_id: formData.get('wechat_id')?.toString() || '',
+      is_recommended: formData.get('is_recommended') === 'true',
+      is_active: formData.get('is_active') !== 'false'
+    }
+
+    const result = await env.DB.prepare(`
+      INSERT INTO working_girls (
+        username, nickname, age, height, weight, gender, region,
+        phone, line_id, wechat_id, is_recommended, is_active
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      workingGirlData.username,
+      workingGirlData.nickname,
+      workingGirlData.age,
+      workingGirlData.height,
+      workingGirlData.weight,
+      workingGirlData.gender,
+      workingGirlData.region,
+      workingGirlData.phone,
+      workingGirlData.line_id,
+      workingGirlData.wechat_id,
+      workingGirlData.is_recommended ? 1 : 0,
+      workingGirlData.is_active ? 1 : 0
+    ).run()
+
+    const workingGirlId = result.meta.last_row_id
+
+    // 사진 처리
+    const photos = []
+    let photoIndex = 0
+    
+    while (formData.get(`photo_${photoIndex}`)) {
+      const photoFile = formData.get(`photo_${photoIndex}`) as File
+      if (photoFile && photoFile.size > 0) {
+        const buffer = await photoFile.arrayBuffer()
+        const base64 = btoa(String.fromCharCode(...new Uint8Array(buffer)))
+        const mimeType = photoFile.type
+        const dataUrl = `data:${mimeType};base64,${base64}`
+        
+        await env.DB.prepare(`
+          INSERT INTO photos (working_girl_id, photo_data, photo_order)
+          VALUES (?, ?, ?)
+        `).bind(workingGirlId, dataUrl, photoIndex + 1).run()
+        
+        photos.push({ order: photoIndex + 1, data: dataUrl })
+      }
+      photoIndex++
+    }
+
+    return c.json({ 
+      success: true, 
+      message: '워킹걸이 성공적으로 등록되었습니다.',
+      workingGirl: { id: workingGirlId, ...workingGirlData },
+      photos
+    })
+    
+  } catch (error) {
+    console.error('Working girl registration error:', error)
+    return c.json({ success: false, message: '등록 중 오류가 발생했습니다.' }, 500)
+  }
+})
+
+// 관리자용 워킹걸 수정 API
+app.put('/api/admin/working-girls/:id', async (c) => {
+  const { env } = c
+  const workingGirlId = c.req.param('id')
+  
+  try {
+    const formData = await c.req.formData()
+    
+    // 워킹걸 존재 확인
+    const existingGirl = await env.DB.prepare(`SELECT * FROM working_girls WHERE id = ?`).bind(workingGirlId).first()
+    if (!existingGirl) {
+      return c.json({ success: false, message: '존재하지 않는 워킹걸입니다.' }, 404)
+    }
+
+    // 아이디 중복 체크 (현재 사용자 제외)
+    const username = formData.get('username')?.toString()
+    if (username && username !== existingGirl.username) {
+      const duplicateUser = await env.DB.prepare(`SELECT id FROM working_girls WHERE username = ? AND id != ?`).bind(username, workingGirlId).first()
+      if (duplicateUser) {
+        return c.json({ success: false, message: '이미 존재하는 아이디입니다.' }, 400)
+      }
+    }
+
+    // 워킹걸 정보 업데이트
+    const updateData = {
+      username: formData.get('username')?.toString() || existingGirl.username,
+      nickname: formData.get('nickname')?.toString() || existingGirl.nickname,
+      age: parseInt(formData.get('age')?.toString() || existingGirl.age?.toString() || '0'),
+      height: parseInt(formData.get('height')?.toString() || existingGirl.height?.toString() || '0'),
+      weight: parseInt(formData.get('weight')?.toString() || existingGirl.weight?.toString() || '0'),
+      gender: formData.get('gender')?.toString() || existingGirl.gender,
+      region: formData.get('region')?.toString() || existingGirl.region,
+      phone: formData.get('phone')?.toString() || existingGirl.phone || '',
+      line_id: formData.get('line_id')?.toString() || existingGirl.line_id || '',
+      wechat_id: formData.get('wechat_id')?.toString() || existingGirl.wechat_id || '',
+      is_recommended: formData.get('is_recommended') === 'true',
+      is_active: formData.get('is_active') !== 'false'
+    }
+
+    await env.DB.prepare(`
+      UPDATE working_girls SET
+        username = ?, nickname = ?, age = ?, height = ?, weight = ?,
+        gender = ?, region = ?, phone = ?, line_id = ?, wechat_id = ?,
+        is_recommended = ?, is_active = ?
+      WHERE id = ?
+    `).bind(
+      updateData.username,
+      updateData.nickname,
+      updateData.age,
+      updateData.height,
+      updateData.weight,
+      updateData.gender,
+      updateData.region,
+      updateData.phone,
+      updateData.line_id,
+      updateData.wechat_id,
+      updateData.is_recommended ? 1 : 0,
+      updateData.is_active ? 1 : 0,
+      workingGirlId
+    ).run()
+
+    // 새 사진 추가 처리
+    const newPhotos = []
+    let photoIndex = 0
+    
+    while (formData.get(`new_photo_${photoIndex}`)) {
+      const photoFile = formData.get(`new_photo_${photoIndex}`) as File
+      if (photoFile && photoFile.size > 0) {
+        const buffer = await photoFile.arrayBuffer()
+        const base64 = btoa(String.fromCharCode(...new Uint8Array(buffer)))
+        const mimeType = photoFile.type
+        const dataUrl = `data:${mimeType};base64,${base64}`
+        
+        // 다음 photo_order 계산
+        const lastOrder = await env.DB.prepare(`
+          SELECT MAX(photo_order) as max_order FROM photos WHERE working_girl_id = ?
+        `).bind(workingGirlId).first()
+        const nextOrder = (lastOrder?.max_order || 0) + 1
+        
+        await env.DB.prepare(`
+          INSERT INTO photos (working_girl_id, photo_data, photo_order)
+          VALUES (?, ?, ?)
+        `).bind(workingGirlId, dataUrl, nextOrder).run()
+        
+        newPhotos.push({ order: nextOrder, data: dataUrl })
+      }
+      photoIndex++
+    }
+
+    // 삭제할 사진 처리
+    const deletePhotoIds = formData.get('delete_photo_ids')?.toString()
+    if (deletePhotoIds) {
+      const photoIdsToDelete = deletePhotoIds.split(',').filter(id => id.trim())
+      for (const photoId of photoIdsToDelete) {
+        await env.DB.prepare(`DELETE FROM photos WHERE id = ? AND working_girl_id = ?`)
+          .bind(photoId.trim(), workingGirlId).run()
+      }
+    }
+
+    return c.json({ 
+      success: true, 
+      message: '워킹걸 정보가 성공적으로 수정되었습니다.',
+      workingGirl: { id: workingGirlId, ...updateData },
+      newPhotos
+    })
+    
+  } catch (error) {
+    console.error('Working girl update error:', error)
+    return c.json({ success: false, message: '수정 중 오류가 발생했습니다.' }, 500)
+  }
+})
+
+// 관리자용 워킹걸 삭제 API
+app.delete('/api/admin/working-girls/:id', async (c) => {
+  const { env } = c
+  const workingGirlId = c.req.param('id')
+  
+  try {
+    // 워킹걸 존재 확인
+    const existingGirl = await env.DB.prepare(`SELECT * FROM working_girls WHERE id = ?`).bind(workingGirlId).first()
+    if (!existingGirl) {
+      return c.json({ success: false, message: '존재하지 않는 워킹걸입니다.' }, 404)
+    }
+
+    // 관련 사진 먼저 삭제
+    await env.DB.prepare(`DELETE FROM photos WHERE working_girl_id = ?`).bind(workingGirlId).run()
+    
+    // 워킹걸 정보 삭제
+    await env.DB.prepare(`DELETE FROM working_girls WHERE id = ?`).bind(workingGirlId).run()
+
+    return c.json({ 
+      success: true, 
+      message: '워킹걸이 성공적으로 삭제되었습니다.'
+    })
+    
+  } catch (error) {
+    console.error('Working girl deletion error:', error)
+    return c.json({ success: false, message: '삭제 중 오류가 발생했습니다.' }, 500)
+  }
+})
+
+// 관리자용 워킹걸 목록 조회 API
+app.get('/api/admin/working-girls', async (c) => {
+  const { env } = c
+  
+  try {
+    const search = c.req.query('search') || ''
+    let query = `
+      SELECT wg.*, 
+        (SELECT COUNT(*) FROM photos WHERE working_girl_id = wg.id) as photo_count
+      FROM working_girls wg
+    `
+    let params = []
+    
+    if (search) {
+      query += ` WHERE (username LIKE ? OR nickname LIKE ? OR region LIKE ?)`
+      params = [`%${search}%`, `%${search}%`, `%${search}%`]
+    }
+    
+    query += ` ORDER BY created_at DESC`
+    
+    const workingGirls = await env.DB.prepare(query).bind(...params).all()
+    
+    return c.json({ 
+      success: true, 
+      workingGirls: workingGirls.results || []
+    })
+    
+  } catch (error) {
+    console.error('Admin working girls list error:', error)
+    return c.json({ success: false, message: '목록 조회 중 오류가 발생했습니다.' }, 500)
+  }
+})
+
+// 관리자용 워킹걸 상세 정보 조회 API (사진 포함)
+app.get('/api/admin/working-girls/:id', async (c) => {
+  const { env } = c
+  const workingGirlId = c.req.param('id')
+  
+  try {
+    // 워킹걸 기본 정보
+    const workingGirl = await env.DB.prepare(`SELECT * FROM working_girls WHERE id = ?`).bind(workingGirlId).first()
+    if (!workingGirl) {
+      return c.json({ success: false, message: '존재하지 않는 워킹걸입니다.' }, 404)
+    }
+
+    // 사진 정보
+    const photos = await env.DB.prepare(`
+      SELECT * FROM photos WHERE working_girl_id = ? ORDER BY photo_order ASC
+    `).bind(workingGirlId).all()
+
+    return c.json({ 
+      success: true, 
+      workingGirl,
+      photos: photos.results || []
+    })
+    
+  } catch (error) {
+    console.error('Admin working girl detail error:', error)
+    return c.json({ success: false, message: '상세 정보 조회 중 오류가 발생했습니다.' }, 500)
   }
 })
 

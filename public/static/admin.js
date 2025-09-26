@@ -1,522 +1,472 @@
 // 관리자 페이지 JavaScript
+let currentWorkingGirls = [];
+let selectedPhotosToDelete = new Set();
 
-let allWorkingGirls = [];
-let allAdvertisements = [];
-
-// 페이지 로드 시 초기화
+// 페이지 로드 시 실행
 document.addEventListener('DOMContentLoaded', function() {
-    loadWorkingGirlsForAdmin();
-    loadAdvertisementsForAdmin();
-    setupAdminEventListeners();
+    loadWorkingGirlsList();
+    setupEventListeners();
 });
 
 // 이벤트 리스너 설정
-function setupAdminEventListeners() {
-    const searchInput = document.getElementById('admin-search');
-    searchInput.addEventListener('keypress', function(e) {
+function setupEventListeners() {
+    // 워킹걸 폼 제출 이벤트
+    document.getElementById('workingGirlForm').addEventListener('submit', handleWorkingGirlSubmit);
+    
+    // 검색 기능
+    document.getElementById('admin-search').addEventListener('keypress', function(e) {
         if (e.key === 'Enter') {
             adminSearch();
         }
     });
 }
 
-// 워킹걸 데이터 로드 (관리자용)
-function loadWorkingGirlsForAdmin(searchQuery = '') {
-    const url = searchQuery ? `/api/admin/working-girls/search?q=${encodeURIComponent(searchQuery)}` : '/api/admin/working-girls';
-
-    // API 엔드포인트가 없으므로 임시로 일반 API 사용
-    axios.get('/api/working-girls')
-        .then(response => {
-            allWorkingGirls = response.data.working_girls || [];
-            
-            // 검색 필터링
-            let filteredGirls = allWorkingGirls;
-            if (searchQuery) {
-                const query = searchQuery.toLowerCase();
-                filteredGirls = allWorkingGirls.filter(girl => 
-                    girl.nickname.toLowerCase().includes(query) ||
-                    girl.user_id.toLowerCase().includes(query) ||
-                    girl.region.toLowerCase().includes(query) ||
-                    girl.gender.toLowerCase().includes(query) ||
-                    (girl.code && girl.code.toLowerCase().includes(query)) ||
-                    girl.age.toString().includes(query)
-                );
-            }
-            
-            displayWorkingGirlsTable(filteredGirls);
-        })
-        .catch(error => {
-            console.error('Failed to load working girls for admin:', error);
-            showAdminNotification('데이터를 불러오는데 실패했습니다.', 'error');
+// 워킹걸 목록 로드
+async function loadWorkingGirlsList(search = '') {
+    try {
+        const response = await axios.get('/api/admin/working-girls', {
+            params: { search }
         });
+        
+        if (response.data.success) {
+            currentWorkingGirls = response.data.workingGirls;
+            displayWorkingGirlsList();
+        } else {
+            alert('목록을 불러오는데 실패했습니다: ' + response.data.message);
+        }
+    } catch (error) {
+        console.error('워킹걸 목록 로드 오류:', error);
+        alert('목록을 불러오는 중 오류가 발생했습니다.');
+    }
 }
 
-// 워킹걸 테이블 표시
-function displayWorkingGirlsTable(workingGirls) {
+// 워킹걸 목록 표시
+function displayWorkingGirlsList() {
     const tableBody = document.getElementById('working-girls-table');
     
-    if (workingGirls.length === 0) {
+    if (currentWorkingGirls.length === 0) {
         tableBody.innerHTML = `
             <tr>
                 <td colspan="10" class="px-4 py-8 text-center text-gray-500">
-                    데이터가 없습니다.
+                    등록된 워킹걸이 없습니다.
                 </td>
             </tr>
         `;
         return;
     }
-
-    const rowsHTML = workingGirls.map(girl => `
-        <tr class="border-b hover:bg-gray-50" onclick="editWorkingGirl(${girl.id})">
-            <td class="px-4 py-3">${girl.code || '없음'}</td>
+    
+    tableBody.innerHTML = currentWorkingGirls.map(girl => `
+        <tr class="border-b hover:bg-gray-50">
+            <td class="px-4 py-3">#${girl.id}</td>
             <td class="px-4 py-3">
-                <button onclick="event.stopPropagation(); toggleRecommended(${girl.id}, ${!girl.is_recommended})" 
-                        class="text-2xl ${girl.is_recommended ? 'text-yellow-400' : 'text-gray-300'} hover:text-yellow-500">
-                    ${girl.is_recommended ? '★' : '☆'}
-                </button>
+                ${girl.is_recommended ? '<span class="text-yellow-500"><i class="fas fa-star"></i></span>' : '-'}
             </td>
-            <td class="px-4 py-3">${girl.region}</td>
-            <td class="px-4 py-3">${girl.user_id}</td>
+            <td class="px-4 py-3">${girl.region || '-'}</td>
+            <td class="px-4 py-3">${girl.username}</td>
             <td class="px-4 py-3">${girl.nickname}</td>
-            <td class="px-4 py-3">${girl.age}</td>
-            <td class="px-4 py-3">${girl.height}cm</td>
-            <td class="px-4 py-3">${girl.weight}kg</td>
-            <td class="px-4 py-3">${girl.gender}</td>
+            <td class="px-4 py-3">${girl.age || '-'}</td>
+            <td class="px-4 py-3">${girl.height ? girl.height + 'cm' : '-'}</td>
+            <td class="px-4 py-3">${girl.weight ? girl.weight + 'kg' : '-'}</td>
             <td class="px-4 py-3">
-                <button onclick="event.stopPropagation(); editWorkingGirl(${girl.id})" 
-                        class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm mr-2">
-                    수정
-                </button>
-                <button onclick="event.stopPropagation(); deleteWorkingGirl(${girl.id})" 
-                        class="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm">
-                    삭제
-                </button>
+                <span class="px-2 py-1 text-xs rounded-full ${
+                    girl.gender === 'female' ? 'bg-pink-100 text-pink-800' :
+                    girl.gender === 'male' ? 'bg-blue-100 text-blue-800' :
+                    'bg-purple-100 text-purple-800'
+                }">
+                    ${girl.gender === 'female' ? '여성' : girl.gender === 'male' ? '남성' : '트랜스젠더'}
+                </span>
+            </td>
+            <td class="px-4 py-3">
+                <span class="px-2 py-1 text-xs rounded-full ${
+                    girl.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                }">
+                    ${girl.is_active ? '활성' : '비활성'}
+                </span>
+            </td>
+            <td class="px-4 py-3">
+                <div class="flex space-x-2">
+                    <button onclick="editWorkingGirl(${girl.id})" 
+                            class="text-blue-600 hover:text-blue-800" title="수정">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button onclick="deleteWorkingGirl(${girl.id})" 
+                            class="text-red-600 hover:text-red-800" title="삭제">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                    <button onclick="viewWorkingGirlPhotos(${girl.id})" 
+                            class="text-green-600 hover:text-green-800" title="사진보기">
+                        <i class="fas fa-images"></i>
+                        <span class="text-xs">${girl.photo_count || 0}</span>
+                    </button>
+                </div>
             </td>
         </tr>
     `).join('');
-
-    tableBody.innerHTML = rowsHTML;
 }
 
-// 관리자 검색
+// 검색 기능
 function adminSearch() {
-    const searchInput = document.getElementById('admin-search');
-    const searchQuery = searchInput.value.trim();
-    loadWorkingGirlsForAdmin(searchQuery);
+    const search = document.getElementById('admin-search').value.trim();
+    loadWorkingGirlsList(search);
 }
 
-// 추천 워킹걸 토글
-function toggleRecommended(workingGirlId, newStatus) {
-    axios.post('/api/admin/working-girl/toggle-recommended', {
-        working_girl_id: workingGirlId,
-        is_recommended: newStatus
-    })
-        .then(response => {
-            if (response.data.success) {
-                loadWorkingGirlsForAdmin(); // 테이블 새로고침
-                showAdminNotification(
-                    newStatus ? '추천 워킹걸로 설정되었습니다.' : '추천이 해제되었습니다.',
-                    'success'
-                );
-            }
-        })
-        .catch(error => {
-            console.error('Toggle recommended error:', error);
-            showAdminNotification('추천 설정 변경에 실패했습니다.', 'error');
-        });
+// 새 워킹걸 등록 모달 표시
+function showAddWorkingGirlModal() {
+    resetWorkingGirlForm();
+    document.getElementById('modalTitle').textContent = '새 워킹걸 등록';
+    document.getElementById('submitBtn').innerHTML = '<i class="fas fa-save mr-2"></i>등록';
+    document.getElementById('existingPhotosSection').classList.add('hidden');
+    document.getElementById('workingGirlModal').classList.remove('hidden');
 }
 
-// 워킹걸 수정 모달
-function editWorkingGirl(workingGirlId) {
-    const girl = allWorkingGirls.find(g => g.id === workingGirlId);
-    if (!girl) return;
-
-    const modalHTML = `
-        <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onclick="closeAdminModal(event)">
-            <div class="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
-                <div class="p-6">
-                    <div class="flex justify-between items-center mb-4">
-                        <h2 class="text-2xl font-bold text-gray-800">워킹걸 정보 수정</h2>
-                        <button onclick="closeAdminModal()" class="text-gray-600 hover:text-gray-800 text-2xl">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    </div>
-
-                    <form onsubmit="updateWorkingGirlByAdmin(event, ${girl.id})">
-                        <!-- 활동상태 -->
-                        <div class="mb-4">
-                            <label class="block text-sm font-medium text-gray-700 mb-2">활동상태</label>
-                            <div class="flex space-x-4">
-                                <label class="flex items-center">
-                                    <input type="radio" name="is_active" value="true" ${girl.is_active ? 'checked' : ''} class="mr-2">
-                                    <span>ON</span>
-                                </label>
-                                <label class="flex items-center">
-                                    <input type="radio" name="is_active" value="false" ${!girl.is_active ? 'checked' : ''} class="mr-2">
-                                    <span>OFF</span>
-                                </label>
-                            </div>
-                        </div>
-
-                        <!-- 추천 워킹걸 -->
-                        <div class="mb-4">
-                            <label class="block text-sm font-medium text-gray-700 mb-2">추천 워킹걸</label>
-                            <div class="flex space-x-4">
-                                <label class="flex items-center">
-                                    <input type="radio" name="is_recommended" value="true" ${girl.is_recommended ? 'checked' : ''} class="mr-2">
-                                    <span>추천</span>
-                                </label>
-                                <label class="flex items-center">
-                                    <input type="radio" name="is_recommended" value="false" ${!girl.is_recommended ? 'checked' : ''} class="mr-2">
-                                    <span>일반</span>
-                                </label>
-                            </div>
-                        </div>
-
-                        <!-- 기본 정보 -->
-                        <div class="grid grid-cols-2 gap-4 mb-4">
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">아이디</label>
-                                <input type="text" value="${girl.user_id}" disabled 
-                                       class="w-full p-3 border border-gray-300 rounded-lg bg-gray-100">
-                            </div>
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">비밀번호</label>
-                                <input type="password" id="edit-password" value="${girl.password}" required 
-                                       class="w-full p-3 border border-gray-300 rounded-lg focus:border-thai-blue focus:outline-none">
-                            </div>
-                        </div>
-
-                        <div class="grid grid-cols-2 gap-4 mb-4">
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">닉네임</label>
-                                <input type="text" id="edit-nickname" value="${girl.nickname}" required 
-                                       class="w-full p-3 border border-gray-300 rounded-lg focus:border-thai-blue focus:outline-none">
-                            </div>
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">나이</label>
-                                <input type="number" id="edit-age" value="${girl.age}" required min="18" max="60" 
-                                       class="w-full p-3 border border-gray-300 rounded-lg focus:border-thai-blue focus:outline-none">
-                            </div>
-                        </div>
-
-                        <div class="grid grid-cols-2 gap-4 mb-4">
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">키 (cm)</label>
-                                <input type="number" id="edit-height" value="${girl.height}" required min="140" max="200" 
-                                       class="w-full p-3 border border-gray-300 rounded-lg focus:border-thai-blue focus:outline-none">
-                            </div>
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">몸무게 (kg)</label>
-                                <input type="number" id="edit-weight" value="${girl.weight}" required min="35" max="120" 
-                                       class="w-full p-3 border border-gray-300 rounded-lg focus:border-thai-blue focus:outline-none">
-                            </div>
-                        </div>
-
-                        <div class="grid grid-cols-2 gap-4 mb-4">
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">성별</label>
-                                <select id="edit-gender" required 
-                                        class="w-full p-3 border border-gray-300 rounded-lg focus:border-thai-blue focus:outline-none">
-                                    <option value="여자" ${girl.gender === '여자' ? 'selected' : ''}>여자</option>
-                                    <option value="트랜스젠더" ${girl.gender === '트랜스젠더' ? 'selected' : ''}>트랜스젠더</option>
-                                    <option value="레이디보이" ${girl.gender === '레이디보이' ? 'selected' : ''}>레이디보이</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">거주 지역</label>
-                                <select id="edit-region" required 
-                                        class="w-full p-3 border border-gray-300 rounded-lg focus:border-thai-blue focus:outline-none">
-                                    <option value="방콕" ${girl.region === '방콕' ? 'selected' : ''}>방콕</option>
-                                    <option value="파타야" ${girl.region === '파타야' ? 'selected' : ''}>파타야</option>
-                                    <option value="치앙마이" ${girl.region === '치앙마이' ? 'selected' : ''}>치앙마이</option>
-                                    <option value="푸켓" ${girl.region === '푸켓' ? 'selected' : ''}>푸켓</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <!-- 연락처 정보 -->
-                        <div class="grid grid-cols-2 gap-4 mb-4">
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">라인 아이디</label>
-                                <input type="text" id="edit-line-id" value="${girl.line_id || ''}" 
-                                       class="w-full p-3 border border-gray-300 rounded-lg focus:border-thai-blue focus:outline-none">
-                            </div>
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">카카오톡 아이디</label>
-                                <input type="text" id="edit-kakao-id" value="${girl.kakao_id || ''}" 
-                                       class="w-full p-3 border border-gray-300 rounded-lg focus:border-thai-blue focus:outline-none">
-                            </div>
-                        </div>
-
-                        <div class="grid grid-cols-2 gap-4 mb-4">
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">전화번호</label>
-                                <input type="tel" id="edit-phone" value="${girl.phone || ''}" 
-                                       class="w-full p-3 border border-gray-300 rounded-lg focus:border-thai-blue focus:outline-none">
-                            </div>
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">코드</label>
-                                <input type="text" id="edit-code" value="${girl.code || ''}" 
-                                       class="w-full p-3 border border-gray-300 rounded-lg focus:border-thai-blue focus:outline-none">
-                            </div>
-                        </div>
-
-                        <div class="flex space-x-4">
-                            <button type="submit" 
-                                    class="flex-1 bg-thai-blue hover:bg-blue-700 text-white p-3 rounded-lg font-medium">
-                                수정 완료
-                            </button>
-                            <button type="button" onclick="closeAdminModal()" 
-                                    class="flex-1 bg-gray-500 hover:bg-gray-600 text-white p-3 rounded-lg font-medium">
-                                취소
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
-    `;
-
-    document.body.insertAdjacentHTML('beforeend', modalHTML);
-}
-
-// 관리자에 의한 워킹걸 정보 업데이트
-function updateWorkingGirlByAdmin(event, workingGirlId) {
-    event.preventDefault();
-
-    const formData = {
-        working_girl_id: workingGirlId,
-        is_active: document.querySelector('input[name="is_active"]:checked').value === 'true',
-        is_recommended: document.querySelector('input[name="is_recommended"]:checked').value === 'true',
-        password: document.getElementById('edit-password').value,
-        nickname: document.getElementById('edit-nickname').value,
-        age: parseInt(document.getElementById('edit-age').value),
-        height: parseInt(document.getElementById('edit-height').value),
-        weight: parseInt(document.getElementById('edit-weight').value),
-        gender: document.getElementById('edit-gender').value,
-        region: document.getElementById('edit-region').value,
-        line_id: document.getElementById('edit-line-id').value,
-        kakao_id: document.getElementById('edit-kakao-id').value,
-        phone: document.getElementById('edit-phone').value,
-        code: document.getElementById('edit-code').value
-    };
-
-    axios.post('/api/admin/working-girl/update', formData)
-        .then(response => {
-            if (response.data.success) {
-                closeAdminModal();
-                loadWorkingGirlsForAdmin(); // 테이블 새로고침
-                showAdminNotification('정보가 수정되었습니다.', 'success');
-            }
-        })
-        .catch(error => {
-            console.error('Update error:', error);
-            showAdminNotification('정보 수정에 실패했습니다.', 'error');
-        });
-}
-
-// 워킹걸 삭제
-function deleteWorkingGirl(workingGirlId) {
-    const girl = allWorkingGirls.find(g => g.id === workingGirlId);
-    if (!girl) return;
-
-    if (!confirm(`'${girl.nickname}' 워킹걸을 정말 삭제하시겠습니까?`)) {
-        return;
+// 워킹걸 수정 모달 표시
+async function editWorkingGirl(workingGirlId) {
+    try {
+        const response = await axios.get(`/api/admin/working-girls/${workingGirlId}`);
+        
+        if (response.data.success) {
+            const { workingGirl, photos } = response.data;
+            
+            // 폼에 기존 데이터 설정
+            document.getElementById('editingWorkingGirlId').value = workingGirl.id;
+            document.getElementById('wg_username').value = workingGirl.username || '';
+            document.getElementById('wg_nickname').value = workingGirl.nickname || '';
+            document.getElementById('wg_age').value = workingGirl.age || '';
+            document.getElementById('wg_height').value = workingGirl.height || '';
+            document.getElementById('wg_weight').value = workingGirl.weight || '';
+            document.getElementById('wg_gender').value = workingGirl.gender || 'female';
+            document.getElementById('wg_region').value = workingGirl.region || '';
+            document.getElementById('wg_phone').value = workingGirl.phone || '';
+            document.getElementById('wg_line_id').value = workingGirl.line_id || '';
+            document.getElementById('wg_wechat_id').value = workingGirl.wechat_id || '';
+            document.getElementById('wg_is_recommended').checked = workingGirl.is_recommended;
+            document.getElementById('wg_is_active').checked = workingGirl.is_active;
+            
+            // 기존 사진 표시
+            displayExistingPhotos(photos);
+            
+            // 모달 설정
+            document.getElementById('modalTitle').textContent = '워킹걸 정보 수정';
+            document.getElementById('submitBtn').innerHTML = '<i class="fas fa-save mr-2"></i>수정';
+            document.getElementById('existingPhotosSection').classList.remove('hidden');
+            document.getElementById('workingGirlModal').classList.remove('hidden');
+        } else {
+            alert('워킹걸 정보를 불러오는데 실패했습니다: ' + response.data.message);
+        }
+    } catch (error) {
+        console.error('워킹걸 정보 로드 오류:', error);
+        alert('워킹걸 정보를 불러오는 중 오류가 발생했습니다.');
     }
-
-    axios.delete(`/api/admin/working-girl/${workingGirlId}`)
-        .then(response => {
-            if (response.data.success) {
-                loadWorkingGirlsForAdmin(); // 테이블 새로고침
-                showAdminNotification('워킹걸이 삭제되었습니다.', 'success');
-            }
-        })
-        .catch(error => {
-            console.error('Delete error:', error);
-            showAdminNotification('삭제에 실패했습니다.', 'error');
-        });
 }
 
-// 광고 데이터 로드 (관리자용)
-function loadAdvertisementsForAdmin() {
-    axios.get('/api/advertisements')
-        .then(response => {
-            allAdvertisements = response.data.advertisements || [];
-            displayAdvertisementsList();
-        })
-        .catch(error => {
-            console.error('Failed to load advertisements:', error);
-            showAdminNotification('광고 데이터를 불러오는데 실패했습니다.', 'error');
-        });
-}
-
-// 광고 리스트 표시
-function displayAdvertisementsList() {
-    const adsList = document.getElementById('advertisements-list');
+// 기존 사진 표시
+function displayExistingPhotos(photos) {
+    const container = document.getElementById('existingPhotosList');
+    selectedPhotosToDelete.clear();
     
-    if (allAdvertisements.length === 0) {
-        adsList.innerHTML = `
-            <p class="text-gray-500 text-center py-4">등록된 광고가 없습니다.</p>
-        `;
+    if (photos.length === 0) {
+        container.innerHTML = '<p class="text-gray-500 col-span-full text-center">등록된 사진이 없습니다.</p>';
         return;
     }
-
-    const adsHTML = allAdvertisements.map(ad => `
-        <div class="flex items-center justify-between p-4 border rounded-lg mb-4">
-            <div class="flex items-center space-x-4">
-                <img src="${ad.image_url}" alt="${ad.title || '광고'}" class="w-16 h-16 object-cover rounded" onerror="this.style.display='none'">
-                <div>
-                    <h3 class="font-medium">${ad.title || '제목 없음'}</h3>
-                    <p class="text-sm text-gray-500">순서: ${ad.display_order}</p>
-                    <p class="text-sm text-gray-500">${ad.is_active ? '활성' : '비활성'}</p>
-                </div>
-            </div>
-            <div class="flex space-x-2">
-                <button onclick="toggleAdvertisement(${ad.id}, ${!ad.is_active})" 
-                        class="px-3 py-1 rounded text-sm ${ad.is_active ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-green-500 hover:bg-green-600'} text-white">
-                    ${ad.is_active ? '비활성화' : '활성화'}
-                </button>
-                <button onclick="deleteAdvertisement(${ad.id})" 
-                        class="px-3 py-1 rounded text-sm bg-red-500 hover:bg-red-600 text-white">
-                    삭제
-                </button>
+    
+    container.innerHTML = photos.map(photo => `
+        <div class="relative group" data-photo-id="${photo.id}">
+            <img src="${photo.photo_data}" 
+                 alt="워킹걸 사진" 
+                 class="w-full h-24 object-cover rounded border cursor-pointer"
+                 onclick="showPhotoLightbox('${photo.photo_data.replace(/'/g, '\\\'').replace(/"/g, '&quot;')}')">
+            <button type="button" 
+                    onclick="togglePhotoForDeletion(${photo.id})"
+                    class="absolute top-1 right-1 bg-red-500 text-white rounded-full w-6 h-6 text-xs opacity-0 group-hover:opacity-100 transition-opacity">
+                <i class="fas fa-times"></i>
+            </button>
+            <div class="absolute bottom-1 left-1 bg-black bg-opacity-50 text-white text-xs px-1 rounded">
+                #${photo.photo_order}
             </div>
         </div>
     `).join('');
-
-    adsList.innerHTML = adsHTML;
 }
 
-// 광고 업로드
-function uploadAdvertisement() {
-    const fileInput = document.getElementById('ad-upload');
-    const file = fileInput.files[0];
-
-    if (!file) {
-        showAdminNotification('파일을 선택해주세요.', 'warning');
-        return;
-    }
-
-    const formData = new FormData();
-    formData.append('advertisement', file);
-
-    axios.post('/api/admin/advertisement/upload', formData, {
-        headers: {
-            'Content-Type': 'multipart/form-data'
-        }
-    })
-        .then(response => {
-            if (response.data.success) {
-                fileInput.value = ''; // 파일 입력 리셋
-                loadAdvertisementsForAdmin(); // 광고 리스트 새로고침
-                showAdminNotification('광고가 업로드되었습니다.', 'success');
-            }
-        })
-        .catch(error => {
-            console.error('Advertisement upload error:', error);
-            showAdminNotification('광고 업로드에 실패했습니다.', 'error');
-        });
-}
-
-// 광고 활성/비활성 토글
-function toggleAdvertisement(adId, newStatus) {
-    axios.post('/api/admin/advertisement/toggle', {
-        advertisement_id: adId,
-        is_active: newStatus
-    })
-        .then(response => {
-            if (response.data.success) {
-                loadAdvertisementsForAdmin(); // 광고 리스트 새로고침
-                showAdminNotification(
-                    newStatus ? '광고가 활성화되었습니다.' : '광고가 비활성화되었습니다.',
-                    'success'
-                );
-            }
-        })
-        .catch(error => {
-            console.error('Toggle advertisement error:', error);
-            showAdminNotification('광고 상태 변경에 실패했습니다.', 'error');
-        });
-}
-
-// 광고 삭제
-function deleteAdvertisement(adId) {
-    if (!confirm('정말 이 광고를 삭제하시겠습니까?')) {
-        return;
-    }
-
-    axios.delete(`/api/admin/advertisement/${adId}`)
-        .then(response => {
-            if (response.data.success) {
-                loadAdvertisementsForAdmin(); // 광고 리스트 새로고침
-                showAdminNotification('광고가 삭제되었습니다.', 'success');
-            }
-        })
-        .catch(error => {
-            console.error('Delete advertisement error:', error);
-            showAdminNotification('광고 삭제에 실패했습니다.', 'error');
-        });
-}
-
-// 관리자 로그아웃
-function adminLogout() {
-    const sessionToken = localStorage.getItem('thaiwiki_session');
+// 사진 삭제 토글
+function togglePhotoForDeletion(photoId) {
+    const photoElement = document.querySelector(`[data-photo-id="${photoId}"]`);
     
-    if (sessionToken) {
-        axios.post('/api/auth/logout', { session_token: sessionToken })
-            .then(() => {
-                localStorage.removeItem('thaiwiki_session');
-                showAdminNotification('로그아웃되었습니다.', 'success');
-                
-                setTimeout(() => {
-                    window.location.href = '/';
-                }, 1000);
-            })
-            .catch(error => {
-                console.error('Logout error:', error);
-                localStorage.removeItem('thaiwiki_session');
-                window.location.href = '/';
-            });
+    if (selectedPhotosToDelete.has(photoId)) {
+        selectedPhotosToDelete.delete(photoId);
+        photoElement.classList.remove('opacity-50', 'border-red-500');
+        photoElement.classList.add('border-gray-300');
     } else {
-        window.location.href = '/';
+        selectedPhotosToDelete.add(photoId);
+        photoElement.classList.add('opacity-50', 'border-red-500');
+        photoElement.classList.remove('border-gray-300');
     }
 }
 
-// 관리자 모달 닫기
-function closeAdminModal(event) {
-    if (event && event.target !== event.currentTarget) return;
+// 새 사진 미리보기
+function previewNewPhotos(input) {
+    const container = document.getElementById('newPhotosPreview');
+    container.innerHTML = '';
     
-    const modals = document.querySelectorAll('.fixed.inset-0');
-    modals.forEach(modal => modal.remove());
+    if (input.files.length === 0) return;
+    
+    Array.from(input.files).forEach((file, index) => {
+        if (file.type.startsWith('image/')) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const div = document.createElement('div');
+                div.className = 'relative group';
+                div.innerHTML = `
+                    <img src="${e.target.result}" 
+                         alt="새 사진 ${index + 1}" 
+                         class="w-full h-24 object-cover rounded border cursor-pointer"
+                         onclick="showPhotoLightbox('${e.target.result.replace(/'/g, '\\\'').replace(/"/g, '&quot;')}')">
+                    <button type="button" 
+                            onclick="removeNewPhoto(${index})"
+                            class="absolute top-1 right-1 bg-red-500 text-white rounded-full w-6 h-6 text-xs opacity-0 group-hover:opacity-100 transition-opacity">
+                        <i class="fas fa-times"></i>
+                    </button>
+                    <div class="absolute bottom-1 left-1 bg-black bg-opacity-50 text-white text-xs px-1 rounded">
+                        새 #${index + 1}
+                    </div>
+                `;
+                container.appendChild(div);
+            };
+            reader.readAsDataURL(file);
+        }
+    });
 }
 
-// 관리자 알림 메시지
-function showAdminNotification(message, type = 'info') {
-    const colors = {
-        success: 'bg-green-500',
-        error: 'bg-red-500',
-        warning: 'bg-yellow-500',
-        info: 'bg-blue-500'
-    };
+// 새 사진 제거
+function removeNewPhoto(index) {
+    const input = document.getElementById('photoFiles');
+    const dt = new DataTransfer();
+    
+    Array.from(input.files).forEach((file, i) => {
+        if (i !== index) {
+            dt.items.add(file);
+        }
+    });
+    
+    input.files = dt.files;
+    previewNewPhotos(input);
+}
 
-    const notification = document.createElement('div');
-    notification.className = `fixed top-4 right-4 ${colors[type]} text-white px-6 py-3 rounded-lg shadow-lg z-50 transition-all duration-300`;
-    notification.innerHTML = `
-        <div class="flex items-center space-x-2">
-            <span>${message}</span>
-            <button onclick="this.parentElement.parentElement.remove()" class="text-white hover:text-gray-200">
+// 사진 라이트박스 표시
+function showPhotoLightbox(imageSrc) {
+    const lightbox = document.createElement('div');
+    lightbox.className = 'fixed inset-0 bg-black bg-opacity-90 z-[60] flex items-center justify-center';
+    lightbox.innerHTML = `
+        <div class="relative max-w-4xl max-h-full p-4">
+            <button onclick="this.parentElement.parentElement.remove()" 
+                    class="absolute top-2 right-2 text-white text-2xl hover:text-gray-300 z-10">
                 <i class="fas fa-times"></i>
             </button>
+            <img src="${imageSrc}" 
+                 alt="사진 확대보기" 
+                 class="max-w-full max-h-full object-contain">
         </div>
     `;
     
-    document.body.appendChild(notification);
-    
-    // 5초 후 자동 제거
-    setTimeout(() => {
-        if (notification.parentElement) {
-            notification.remove();
+    // 배경 클릭 시 닫기
+    lightbox.addEventListener('click', function(e) {
+        if (e.target === lightbox) {
+            lightbox.remove();
         }
-    }, 5000);
+    });
+    
+    document.body.appendChild(lightbox);
+}
+
+// 워킹걸 폼 제출 처리
+async function handleWorkingGirlSubmit(e) {
+    e.preventDefault();
+    
+    const form = e.target;
+    const formData = new FormData();
+    const editingId = document.getElementById('editingWorkingGirlId').value;
+    
+    // 기본 정보 추가
+    const fields = ['username', 'nickname', 'age', 'height', 'weight', 'gender', 'region', 'phone', 'line_id', 'wechat_id'];
+    fields.forEach(field => {
+        const element = document.getElementById(`wg_${field}`);
+        if (element) {
+            formData.append(field, element.value);
+        }
+    });
+    
+    // 체크박스 처리
+    formData.append('is_recommended', document.getElementById('wg_is_recommended').checked);
+    formData.append('is_active', document.getElementById('wg_is_active').checked);
+    
+    // 새 사진 파일 추가
+    const photoFiles = document.getElementById('photoFiles').files;
+    Array.from(photoFiles).forEach((file, index) => {
+        if (editingId) {
+            formData.append(`new_photo_${index}`, file);
+        } else {
+            formData.append(`photo_${index}`, file);
+        }
+    });
+    
+    // 삭제할 사진 ID 추가 (수정 모드일 때만)
+    if (editingId && selectedPhotosToDelete.size > 0) {
+        formData.append('delete_photo_ids', Array.from(selectedPhotosToDelete).join(','));
+    }
+    
+    try {
+        let response;
+        if (editingId) {
+            // 수정 요청
+            response = await axios.put(`/api/admin/working-girls/${editingId}`, formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+        } else {
+            // 등록 요청
+            response = await axios.post('/api/admin/working-girls', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+        }
+        
+        if (response.data.success) {
+            alert(response.data.message);
+            closeWorkingGirlModal();
+            loadWorkingGirlsList(); // 목록 새로고침
+        } else {
+            alert('오류: ' + response.data.message);
+        }
+    } catch (error) {
+        console.error('워킹걸 저장 오류:', error);
+        alert('저장 중 오류가 발생했습니다.');
+    }
+}
+
+// 워킹걸 삭제
+async function deleteWorkingGirl(workingGirlId) {
+    if (!confirm('정말로 이 워킹걸을 삭제하시겠습니까? 삭제된 데이터는 복구할 수 없습니다.')) {
+        return;
+    }
+    
+    try {
+        const response = await axios.delete(`/api/admin/working-girls/${workingGirlId}`);
+        
+        if (response.data.success) {
+            alert(response.data.message);
+            loadWorkingGirlsList(); // 목록 새로고침
+        } else {
+            alert('삭제 실패: ' + response.data.message);
+        }
+    } catch (error) {
+        console.error('워킹걸 삭제 오류:', error);
+        alert('삭제 중 오류가 발생했습니다.');
+    }
+}
+
+// 워킹걸 사진 보기
+async function viewWorkingGirlPhotos(workingGirlId) {
+    try {
+        const response = await axios.get(`/api/admin/working-girls/${workingGirlId}`);
+        
+        if (response.data.success) {
+            const { workingGirl, photos } = response.data;
+            
+            if (photos.length === 0) {
+                alert(`${workingGirl.nickname}님의 등록된 사진이 없습니다.`);
+                return;
+            }
+            
+            // 사진 갤러리 모달 생성
+            const galleryModal = document.createElement('div');
+            galleryModal.className = 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center';
+            galleryModal.innerHTML = `
+                <div class="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-screen overflow-y-auto">
+                    <div class="p-6 border-b flex justify-between items-center">
+                        <h3 class="text-xl font-bold">${workingGirl.nickname}님의 사진 (${photos.length}장)</h3>
+                        <button onclick="this.closest('.fixed').remove()" 
+                                class="text-gray-500 hover:text-gray-700">
+                            <i class="fas fa-times text-xl"></i>
+                        </button>
+                    </div>
+                    <div class="p-6">
+                        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                            ${photos.map(photo => `
+                                <div class="relative">
+                                    <img src="${photo.photo_data}" 
+                                         alt="워킹걸 사진" 
+                                         class="w-full h-32 object-cover rounded cursor-pointer hover:opacity-80"
+                                         onclick="showPhotoLightbox('${photo.photo_data.replace(/'/g, '\\\'').replace(/"/g, '&quot;')}')">
+                                    <div class="absolute bottom-1 left-1 bg-black bg-opacity-50 text-white text-xs px-1 rounded">
+                                        #${photo.photo_order}
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(galleryModal);
+            
+            // 배경 클릭 시 닫기
+            galleryModal.addEventListener('click', function(e) {
+                if (e.target === galleryModal) {
+                    galleryModal.remove();
+                }
+            });
+        } else {
+            alert('사진을 불러오는데 실패했습니다: ' + response.data.message);
+        }
+    } catch (error) {
+        console.error('사진 로드 오류:', error);
+        alert('사진을 불러오는 중 오류가 발생했습니다.');
+    }
+}
+
+// 워킹걸 모달 닫기
+function closeWorkingGirlModal() {
+    document.getElementById('workingGirlModal').classList.add('hidden');
+    resetWorkingGirlForm();
+}
+
+// 워킹걸 폼 초기화
+function resetWorkingGirlForm() {
+    document.getElementById('workingGirlForm').reset();
+    document.getElementById('editingWorkingGirlId').value = '';
+    document.getElementById('newPhotosPreview').innerHTML = '';
+    document.getElementById('existingPhotosList').innerHTML = '';
+    selectedPhotosToDelete.clear();
+    
+    // 기본값 설정
+    document.getElementById('wg_is_active').checked = true;
+}
+
+// 관리자 로그아웃
+async function adminLogout() {
+    if (!confirm('로그아웃 하시겠습니까?')) return;
+    
+    try {
+        const response = await axios.post('/api/admin/logout');
+        if (response.data.success) {
+            alert('로그아웃 되었습니다.');
+            window.location.href = '/';
+        } else {
+            alert('로그아웃에 실패했습니다.');
+        }
+    } catch (error) {
+        console.error('로그아웃 오류:', error);
+        alert('로그아웃 중 오류가 발생했습니다.');
+    }
+}
+
+// 광고 관리 기능들 (기본 구조만)
+async function uploadAdvertisement() {
+    const fileInput = document.getElementById('ad-upload');
+    const file = fileInput.files[0];
+    
+    if (!file) {
+        alert('업로드할 광고 이미지를 선택해주세요.');
+        return;
+    }
+    
+    // TODO: 광고 업로드 API 구현
+    alert('광고 업로드 기능은 추후 구현 예정입니다.');
 }
