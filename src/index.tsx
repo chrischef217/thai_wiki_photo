@@ -11,6 +11,56 @@ app.use('/api/*', cors())
 // 정적 파일 서빙
 app.use('/static/*', serveStatic({ root: './public' }))
 
+// 데이터베이스 초기화 API (모든 샘플 데이터 삭제)
+app.get('/clean-database', async (c) => {
+  const { env } = c
+  
+  if (!env.DB) {
+    return c.text('데이터베이스 연결 실패', 500)
+  }
+  
+  try {
+    let output = '<h1>🧹 데이터베이스 정리</h1>'
+    
+    // 1. 워킹걸 데이터 삭제
+    const workingGirlsResult = await env.DB.prepare(`DELETE FROM working_girls`).run()
+    output += `<p>🗑️ 워킹걸 데이터 삭제: ${workingGirlsResult.changes}건</p>`
+    
+    // 2. 워킹걸 사진 데이터 삭제
+    const photosResult = await env.DB.prepare(`DELETE FROM working_girl_photos`).run()
+    output += `<p>🖼️ 사진 데이터 삭제: ${photosResult.changes}건</p>`
+    
+    // 3. 광고 데이터 삭제
+    const adsResult = await env.DB.prepare(`DELETE FROM advertisements`).run()
+    output += `<p>📢 광고 데이터 삭제: ${adsResult.changes}건</p>`
+    
+    // 4. 세션 데이터 삭제 (로그인 세션 정리)
+    const sessionsResult = await env.DB.prepare(`DELETE FROM sessions`).run()
+    output += `<p>🔐 세션 데이터 삭제: ${sessionsResult.changes}건</p>`
+    
+    // 5. 테이블 상태 확인
+    const workingGirlsCount = await env.DB.prepare(`SELECT COUNT(*) as count FROM working_girls`).first()
+    const photosCount = await env.DB.prepare(`SELECT COUNT(*) as count FROM working_girl_photos`).first()
+    const adsCount = await env.DB.prepare(`SELECT COUNT(*) as count FROM advertisements`).first()
+    const adminsCount = await env.DB.prepare(`SELECT COUNT(*) as count FROM admins`).first()
+    
+    output += '<br><h2>📊 정리 후 상태</h2>'
+    output += `<p>워킹걸: ${workingGirlsCount.count}건</p>`
+    output += `<p>사진: ${photosCount.count}건</p>`
+    output += `<p>광고: ${adsCount.count}건</p>`
+    output += `<p>관리자: ${adminsCount.count}건 (유지됨)</p>`
+    
+    output += '<br><p style="color: green; font-weight: bold;">✅ 모든 샘플 데이터가 성공적으로 삭제되었습니다!</p>'
+    output += '<p>이제 깨끗한 상태에서 실제 데이터를 입력할 수 있습니다.</p>'
+    output += '<br><p><a href="/">메인으로 돌아가기</a> | <a href="/admin">관리자 페이지</a></p>'
+    
+    return c.html(output)
+    
+  } catch (error) {
+    return c.text(`데이터 삭제 에러: ${error.message}`, 500)
+  }
+})
+
 // 관리자 계정 디버깅 및 수정 API
 app.get('/setup-admin', async (c) => {
   const { env } = c
