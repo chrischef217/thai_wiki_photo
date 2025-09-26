@@ -5,6 +5,7 @@ let selectedPhotosToDelete = new Set();
 // 페이지 로드 시 실행
 document.addEventListener('DOMContentLoaded', function() {
     loadWorkingGirlsList();
+    loadAdvertisementsList();
     setupEventListeners();
 });
 
@@ -47,7 +48,7 @@ function displayWorkingGirlsList() {
     if (currentWorkingGirls.length === 0) {
         tableBody.innerHTML = `
             <tr>
-                <td colspan="10" class="px-4 py-8 text-center text-gray-500">
+                <td colspan="13" class="px-4 py-8 text-center text-gray-500">
                     등록된 워킹걸이 없습니다.
                 </td>
             </tr>
@@ -57,7 +58,8 @@ function displayWorkingGirlsList() {
     
     tableBody.innerHTML = currentWorkingGirls.map(girl => `
         <tr class="border-b hover:bg-gray-50">
-            <td class="px-4 py-3">#${girl.id}</td>
+            <td class="px-4 py-3">${girl.agency || '-'}</td>
+            <td class="px-4 py-3">${girl.management_code || girl.code || '-'}</td>
             <td class="px-4 py-3">
                 ${girl.is_recommended ? '<span class="text-yellow-500"><i class="fas fa-star"></i></span>' : '-'}
             </td>
@@ -82,6 +84,13 @@ function displayWorkingGirlsList() {
                 }">
                     ${girl.is_active ? '활성' : '비활성'}
                 </span>
+            </td>
+            <td class="px-4 py-3">
+                <div class="flex space-x-2">
+                    ${girl.phone ? `<a href="tel:${girl.phone}" class="text-green-600 hover:text-green-800" title="전화걸기"><i class="fas fa-phone"></i></a>` : ''}
+                    ${girl.line_id ? `<a href="https://line.me/ti/p/~${girl.line_id}" target="_blank" class="text-green-500 hover:text-green-700" title="라인 연결"><i class="fab fa-line"></i></a>` : ''}
+                    ${girl.kakao_id ? `<a href="https://open.kakao.com/o/${girl.kakao_id}" target="_blank" class="text-yellow-500 hover:text-yellow-700" title="카카오톡 연결"><i class="fas fa-comment"></i></a>` : ''}
+                </div>
             </td>
             <td class="px-4 py-3">
                 <div class="flex space-x-2">
@@ -131,7 +140,8 @@ async function editWorkingGirl(workingGirlId) {
             document.getElementById('editingWorkingGirlId').value = workingGirl.id;
             document.getElementById('wg_username').value = workingGirl.user_id || '';
             document.getElementById('wg_nickname').value = workingGirl.nickname || '';
-            document.getElementById('wg_code').value = workingGirl.code || '';
+            document.getElementById('wg_management_code').value = workingGirl.management_code || '';
+            document.getElementById('wg_agency').value = workingGirl.agency || '';
             document.getElementById('wg_age').value = workingGirl.age || '';
             document.getElementById('wg_height').value = workingGirl.height || '';
             document.getElementById('wg_weight').value = workingGirl.weight || '';
@@ -144,6 +154,7 @@ async function editWorkingGirl(workingGirlId) {
             document.getElementById('wg_phone').value = workingGirl.phone || '';
             document.getElementById('wg_line_id').value = workingGirl.line_id || '';
             document.getElementById('wg_wechat_id').value = workingGirl.kakao_id || '';
+            document.getElementById('wg_conditions').value = workingGirl.conditions || '';
             document.getElementById('wg_is_recommended').checked = workingGirl.is_recommended;
             document.getElementById('wg_is_active').checked = workingGirl.is_active;
             
@@ -188,7 +199,7 @@ function displayExistingPhotos(photos) {
                  onclick="showPhotoLightbox('${photo.photo_url.replace(/'/g, '\\\'').replace(/"/g, '&quot;')}')">
             <button type="button" 
                     onclick="togglePhotoForDeletion(${photo.id})"
-                    class="absolute top-1 right-1 bg-red-500 text-white rounded-full w-6 h-6 text-xs opacity-0 group-hover:opacity-100 transition-opacity">
+                    class="absolute top-1 right-1 bg-red-500 text-white rounded-full w-6 h-6 text-xs opacity-70 hover:opacity-100 transition-opacity">
                 <i class="fas fa-times"></i>
             </button>
             <div class="absolute bottom-1 left-1 bg-black bg-opacity-50 text-white text-xs px-1 rounded">
@@ -250,7 +261,7 @@ function previewNewPhotos(input) {
                      onclick="showPhotoLightbox('${e.target.result.replace(/'/g, '\\\'').replace(/"/g, '&quot;')}')">
                 <button type="button" 
                         onclick="removeNewPhoto(${index})"
-                        class="absolute top-1 right-1 bg-red-500 text-white rounded-full w-6 h-6 text-xs opacity-0 group-hover:opacity-100 transition-opacity">
+                        class="absolute top-1 right-1 bg-red-500 text-white rounded-full w-6 h-6 text-xs opacity-70 hover:opacity-100 transition-opacity">
                     <i class="fas fa-times"></i>
                 </button>
                 <div class="absolute bottom-1 left-1 bg-black bg-opacity-50 text-white text-xs px-1 rounded">
@@ -320,7 +331,7 @@ async function handleWorkingGirlSubmit(e) {
     const editingId = document.getElementById('editingWorkingGirlId').value;
     
     // 기본 정보 추가
-    const fields = ['username', 'nickname', 'code', 'age', 'height', 'weight', 'gender', 'region', 'phone', 'line_id', 'wechat_id'];
+    const fields = ['username', 'nickname', 'management_code', 'agency', 'age', 'height', 'weight', 'gender', 'region', 'phone', 'line_id', 'wechat_id', 'conditions'];
     fields.forEach(field => {
         const element = document.getElementById(`wg_${field}`);
         if (element) {
@@ -494,16 +505,236 @@ async function adminLogout() {
     }
 }
 
-// 광고 관리 기능들 (기본 구조만)
+// 광고 관리 기능들
 async function uploadAdvertisement() {
     const fileInput = document.getElementById('ad-upload');
+    const titleInput = document.getElementById('ad-title');
+    const linkInput = document.getElementById('ad-link');
     const file = fileInput.files[0];
     
     if (!file) {
         alert('업로드할 광고 이미지를 선택해주세요.');
         return;
     }
+
+    // 파일 크기 검증 (10MB)
+    if (file.size > 10 * 1024 * 1024) {
+        alert('파일 크기가 너무 큽니다. (최대 10MB)');
+        return;
+    }
+
+    // 이미지 파일 검증
+    if (!file.type.startsWith('image/')) {
+        alert('이미지 파일만 업로드 가능합니다.');
+        return;
+    }
+
+    // URL 유효성 검증 (입력된 경우만)
+    const linkUrl = linkInput ? linkInput.value.trim() : '';
+    if (linkUrl && !isValidUrl(linkUrl)) {
+        alert('올바른 URL 형식을 입력해주세요. (예: https://example.com)');
+        return;
+    }
+
+    try {
+        const formData = new FormData();
+        formData.append('advertisement', file);
+        formData.append('title', titleInput ? titleInput.value : '');
+        formData.append('link_url', linkUrl);
+
+        const response = await axios.post('/api/admin/advertisements', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        });
+
+        if (response.data.success) {
+            alert(response.data.message);
+            fileInput.value = '';
+            if (titleInput) titleInput.value = '';
+            if (linkInput) linkInput.value = '';
+            loadAdvertisementsList(); // 광고 목록 새로고침
+        } else {
+            alert('업로드 실패: ' + response.data.message);
+        }
+    } catch (error) {
+        console.error('광고 업로드 오류:', error);
+        alert('업로드 중 오류가 발생했습니다.');
+    }
+}
+
+// URL 유효성 검증 함수
+function isValidUrl(string) {
+    try {
+        new URL(string);
+        return true;
+    } catch (_) {
+        return false;  
+    }
+}
+
+// 광고 목록 로드
+async function loadAdvertisementsList() {
+    try {
+        const response = await axios.get('/api/admin/advertisements');
+        
+        if (response.data.success) {
+            displayAdvertisementsList(response.data.advertisements);
+        } else {
+            console.error('광고 목록 로드 실패:', response.data.message);
+        }
+    } catch (error) {
+        console.error('광고 목록 로드 오류:', error);
+    }
+}
+
+// 광고 목록 표시
+function displayAdvertisementsList(advertisements) {
+    const container = document.getElementById('advertisements-list');
     
-    // TODO: 광고 업로드 API 구현
-    alert('광고 업로드 기능은 추후 구현 예정입니다.');
+    if (advertisements.length === 0) {
+        container.innerHTML = '<p class="text-gray-500 text-center py-8">등록된 광고가 없습니다.</p>';
+        return;
+    }
+    
+    container.innerHTML = `
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            ${advertisements.map(ad => `
+                <div class="border rounded-lg p-4 ${ad.is_active ? 'border-green-300 bg-green-50' : 'border-red-300 bg-red-50'}">
+                    <img src="${ad.image_url}" 
+                         alt="${ad.title || '광고 이미지'}" 
+                         class="w-full h-32 object-cover rounded mb-3 cursor-pointer"
+                         onclick="showPhotoLightbox('${ad.image_url.replace(/'/g, '\\\'').replace(/"/g, '&quot;')}')">
+                    
+                    <div class="mb-3">
+                        <div class="flex justify-between items-start mb-2">
+                            <div class="flex-1">
+                                <p class="font-medium text-sm">${ad.title || '제목 없음'}</p>
+                                <p class="text-xs text-gray-500">순서: ${ad.display_order}</p>
+                            </div>
+                            <span class="px-2 py-1 text-xs rounded-full ${
+                                ad.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                            }">
+                                ${ad.is_active ? '활성' : '비활성'}
+                            </span>
+                        </div>
+                        ${ad.link_url ? `
+                            <div class="text-xs text-blue-600 truncate" title="${ad.link_url}">
+                                <i class="fas fa-link mr-1"></i>${ad.link_url}
+                            </div>
+                        ` : ''}
+                    </div>
+                    
+                    <div class="flex flex-col space-y-2">
+                        <div class="flex space-x-2">
+                            <button onclick="editAdvertisement(${ad.id})" 
+                                    class="flex-1 px-3 py-1 text-xs bg-blue-500 hover:bg-blue-600 text-white rounded">
+                                <i class="fas fa-edit mr-1"></i>편집
+                            </button>
+                            <button onclick="toggleAdvertisement(${ad.id}, ${!ad.is_active})" 
+                                    class="flex-1 px-3 py-1 text-xs rounded ${
+                                        ad.is_active ? 'bg-yellow-500 hover:bg-yellow-600 text-white' : 'bg-green-500 hover:bg-green-600 text-white'
+                                    }">
+                                ${ad.is_active ? '비활성화' : '활성화'}
+                            </button>
+                        </div>
+                        <button onclick="deleteAdvertisement(${ad.id})" 
+                                class="w-full px-3 py-1 text-xs bg-red-500 hover:bg-red-600 text-white rounded">
+                            <i class="fas fa-trash mr-1"></i>삭제
+                        </button>
+                    </div>
+                </div>
+            `).join('')}
+        </div>
+    `;
+}
+
+// 광고 활성화/비활성화 토글
+async function toggleAdvertisement(adId, isActive) {
+    try {
+        const response = await axios.put(`/api/admin/advertisements/${adId}/toggle`, {
+            is_active: isActive
+        });
+        
+        if (response.data.success) {
+            alert(response.data.message);
+            loadAdvertisementsList(); // 목록 새로고침
+        } else {
+            alert('상태 변경 실패: ' + response.data.message);
+        }
+    } catch (error) {
+        console.error('광고 상태 변경 오류:', error);
+        alert('상태 변경 중 오류가 발생했습니다.');
+    }
+}
+
+// 광고 편집
+async function editAdvertisement(adId) {
+    // 현재 광고 정보 가져오기
+    const currentAds = await getCurrentAdvertisements();
+    const ad = currentAds.find(a => a.id === adId);
+    
+    if (!ad) {
+        alert('광고 정보를 찾을 수 없습니다.');
+        return;
+    }
+
+    const title = prompt('광고 제목을 입력하세요:', ad.title || '');
+    if (title === null) return; // 취소
+
+    const linkUrl = prompt('링크 URL을 입력하세요 (선택사항):', ad.link_url || '');
+    if (linkUrl === null) return; // 취소
+
+    // URL 유효성 검증 (입력된 경우만)
+    if (linkUrl.trim() && !isValidUrl(linkUrl.trim())) {
+        alert('올바른 URL 형식을 입력해주세요. (예: https://example.com)');
+        return;
+    }
+
+    try {
+        const response = await axios.put(`/api/admin/advertisements/${adId}`, {
+            title: title,
+            link_url: linkUrl.trim()
+        });
+        
+        if (response.data.success) {
+            alert(response.data.message);
+            loadAdvertisementsList(); // 목록 새로고침
+        } else {
+            alert('업데이트 실패: ' + response.data.message);
+        }
+    } catch (error) {
+        console.error('광고 업데이트 오류:', error);
+        alert('업데이트 중 오류가 발생했습니다.');
+    }
+}
+
+// 현재 광고 목록 가져오기 (편집용)
+async function getCurrentAdvertisements() {
+    try {
+        const response = await axios.get('/api/admin/advertisements');
+        return response.data.success ? response.data.advertisements : [];
+    } catch (error) {
+        console.error('광고 목록 조회 오류:', error);
+        return [];
+    }
+}
+
+// 광고 삭제
+async function deleteAdvertisement(adId) {
+    if (!confirm('정말로 이 광고를 삭제하시겠습니까?')) {
+        return;
+    }
+    
+    try {
+        const response = await axios.delete(`/api/admin/advertisements/${adId}`);
+        
+        if (response.data.success) {
+            alert(response.data.message);
+            loadAdvertisementsList(); // 목록 새로고침
+        } else {
+            alert('삭제 실패: ' + response.data.message);
+        }
+    } catch (error) {
+        console.error('광고 삭제 오류:', error);
+        alert('삭제 중 오류가 발생했습니다.');
+    }
 }

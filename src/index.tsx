@@ -63,7 +63,8 @@ app.get('/', async (c) => {
           line_id TEXT,
           kakao_id TEXT,
           phone TEXT,
-          code TEXT,
+          management_code TEXT NOT NULL,
+          agency TEXT,
           conditions TEXT,
           main_photo TEXT,
           is_active BOOLEAN DEFAULT 1,
@@ -72,6 +73,26 @@ app.get('/', async (c) => {
           updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
       `).run()
+
+      // 기존 테이블에 새 컬럼 추가 (이미 테이블이 존재하는 경우)
+      try {
+        await env.DB.prepare(`ALTER TABLE working_girls ADD COLUMN management_code TEXT`).run()
+      } catch (e) {
+        // 컬럼이 이미 존재하는 경우 무시
+      }
+      
+      try {
+        await env.DB.prepare(`ALTER TABLE working_girls ADD COLUMN agency TEXT`).run()
+      } catch (e) {
+        // 컬럼이 이미 존재하는 경우 무시
+      }
+      
+      // 기존 code 컬럼 데이터를 management_code로 복사 (한 번만 실행)
+      try {
+        await env.DB.prepare(`UPDATE working_girls SET management_code = code WHERE management_code IS NULL AND code IS NOT NULL`).run()
+      } catch (e) {
+        // 에러 무시
+      }
 
       // 워킹걸 사진 테이블 생성
       await env.DB.prepare(`
@@ -102,11 +123,19 @@ app.get('/', async (c) => {
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           image_url TEXT NOT NULL,
           title TEXT,
+          link_url TEXT,
           display_order INTEGER DEFAULT 0,
           is_active BOOLEAN DEFAULT 1,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
       `).run()
+
+      // 기존 테이블에 link_url 컬럼 추가 (이미 테이블이 존재하는 경우)
+      try {
+        await env.DB.prepare(`ALTER TABLE advertisements ADD COLUMN link_url TEXT`).run()
+      } catch (e) {
+        // 컬럼이 이미 존재하는 경우 무시
+      }
 
       // 세션 테이블 생성
       await env.DB.prepare(`
@@ -125,38 +154,9 @@ app.get('/', async (c) => {
         INSERT OR IGNORE INTO admins (username, password) VALUES ('admin', '1127')
       `).run()
 
-      // 테스트 데이터 삽입
-      await env.DB.prepare(`
-        INSERT OR IGNORE INTO working_girls (
-          user_id, password, nickname, age, height, weight, gender, region, 
-          line_id, kakao_id, phone, code, main_photo, is_active, is_recommended
-        ) VALUES 
-          ('user001', '1234', '나나', 25, 165, 50, '여자', '방콕', 'line_nana', 'kakao_nana', '0901234567', 'VIP001', '/static/photos/nana_main.jpg', 1, 1),
-          ('user002', '2345', '미미', 23, 160, 48, '레이디보이', '파타야', 'line_mimi', 'kakao_mimi', '0902345678', '', '/static/photos/mimi_main.jpg', 1, 0),
-          ('user003', '3456', '소피아', 28, 168, 52, '트랜스젠더', '치앙마이', 'line_sophia', 'kakao_sophia', '0903456789', 'GOLD003', '/static/photos/sophia_main.jpg', 0, 0),
-          ('user004', '4567', '리사', 26, 162, 49, '여자', '푸켓', 'line_lisa', 'kakao_lisa', '0904567890', '', '/static/photos/lisa_main.jpg', 1, 1)
-      `).run()
+      // 테스트 데이터 삽입 제거됨 - 운영 환경에서는 테스트 데이터를 자동 생성하지 않음
 
-      // 테스트 사진 데이터 삽입
-      await env.DB.prepare(`
-        INSERT OR IGNORE INTO working_girl_photos (working_girl_id, photo_url, is_main, upload_order) VALUES 
-          (1, '/static/photos/nana_main.jpg', 1, 1),
-          (1, '/static/photos/nana_2.jpg', 0, 2),
-          (1, '/static/photos/nana_3.jpg', 0, 3),
-          (2, '/static/photos/mimi_main.jpg', 1, 1),
-          (2, '/static/photos/mimi_2.jpg', 0, 2),
-          (3, '/static/photos/sophia_main.jpg', 1, 1),
-          (4, '/static/photos/lisa_main.jpg', 1, 1),
-          (4, '/static/photos/lisa_2.jpg', 0, 2)
-      `).run()
-
-      // 테스트 광고 데이터 삽입
-      await env.DB.prepare(`
-        INSERT OR IGNORE INTO advertisements (image_url, title, display_order, is_active) VALUES 
-          ('/static/ads/ad1.jpg', '광고1', 1, 1),
-          ('/static/ads/ad2.jpg', '광고2', 2, 1),
-          ('/static/ads/ad3.jpg', '광고3', 3, 1)
-      `).run()
+      // 테스트 광고 데이터는 제거 (파일이 없어서 404 오류 발생)
 
     } catch (error) {
       console.log('Database initialization error:', error)
@@ -300,23 +300,29 @@ app.get('/api/working-girls', async (c) => {
   const { env } = c
 
   try {
-    const result = await env.DB.prepare(`
-      SELECT 
-        wg.*,
-        GROUP_CONCAT(
-          JSON_OBJECT('id', wp.id, 'photo_url', wp.photo_url, 'is_main', wp.is_main, 'upload_order', wp.upload_order)
-        ) as photos
-      FROM working_girls wg
-      LEFT JOIN working_girl_photos wp ON wg.id = wp.working_girl_id
-      WHERE wg.is_active = 1
-      GROUP BY wg.id
-      ORDER BY wg.is_recommended DESC, wg.created_at DESC
+    // 워킹걸 기본 정보만 먼저 조회
+    const girlsResult = await env.DB.prepare(`
+      SELECT * FROM working_girls 
+      WHERE is_active = 1
+      ORDER BY is_recommended DESC, created_at DESC
     `).all()
 
-    const workingGirls = result.results.map(girl => ({
-      ...girl,
-      photos: girl.photos ? JSON.parse(`[${girl.photos}]`) : []
-    }))
+    const workingGirls = []
+
+    // 각 워킹걸의 사진을 개별적으로 조회
+    for (const girl of girlsResult.results || []) {
+      const photosResult = await env.DB.prepare(`
+        SELECT id, photo_url, is_main, upload_order 
+        FROM working_girl_photos 
+        WHERE working_girl_id = ? 
+        ORDER BY upload_order ASC
+      `).bind(girl.id).all()
+
+      workingGirls.push({
+        ...girl,
+        photos: photosResult.results || []
+      })
+    }
 
     return c.json({ success: true, working_girls: workingGirls })
   } catch (error) {
@@ -332,29 +338,34 @@ app.get('/api/working-girls/search', async (c) => {
 
   try {
     const searchPattern = `%${query}%`
-    const result = await env.DB.prepare(`
-      SELECT 
-        wg.*,
-        GROUP_CONCAT(
-          JSON_OBJECT('id', wp.id, 'photo_url', wp.photo_url, 'is_main', wp.is_main, 'upload_order', wp.upload_order)
-        ) as photos
-      FROM working_girls wg
-      LEFT JOIN working_girl_photos wp ON wg.id = wp.working_girl_id
+    const girlsResult = await env.DB.prepare(`
+      SELECT * FROM working_girls 
       WHERE (
-        wg.nickname LIKE ? OR
-        wg.region LIKE ? OR
-        wg.gender LIKE ? OR
-        wg.code LIKE ? OR
-        CAST(wg.age AS TEXT) LIKE ?
+        nickname LIKE ? OR
+        region LIKE ? OR
+        gender LIKE ? OR
+        management_code LIKE ? OR
+        CAST(age AS TEXT) LIKE ?
       )
-      GROUP BY wg.id
-      ORDER BY wg.is_recommended DESC, wg.created_at DESC
+      ORDER BY is_recommended DESC, created_at DESC
     `).bind(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern).all()
 
-    const workingGirls = result.results.map(girl => ({
-      ...girl,
-      photos: girl.photos ? JSON.parse(`[${girl.photos}]`) : []
-    }))
+    const workingGirls = []
+
+    // 각 워킹걸의 사진을 개별적으로 조회
+    for (const girl of girlsResult.results || []) {
+      const photosResult = await env.DB.prepare(`
+        SELECT id, photo_url, is_main, upload_order 
+        FROM working_girl_photos 
+        WHERE working_girl_id = ? 
+        ORDER BY upload_order ASC
+      `).bind(girl.id).all()
+
+      workingGirls.push({
+        ...girl,
+        photos: photosResult.results || []
+      })
+    }
 
     return c.json({ success: true, working_girls: workingGirls })
   } catch (error) {
@@ -476,17 +487,25 @@ app.post('/api/auth/working-girl/register', async (c) => {
               continue
             }
             
-            // Base64 변환 (Web API 사용 - 더 안전함)
+            // Base64 변환 - 완전히 안전한 방식으로 처리
             const arrayBuffer = await photo.arrayBuffer()
             const bytes = new Uint8Array(arrayBuffer)
             
-            // 바이너리를 Base64로 안전하게 변환
-            let binary = '';
-            const len = bytes.byteLength;
-            for (let j = 0; j < len; j++) {
-              binary += String.fromCharCode(bytes[j]);
+            // 바이너리 데이터를 문자열로 안전하게 변환
+            let binaryString = ''
+            
+            // 작은 청크 단위로 안전하게 처리 (스택 오버플로우 방지)
+            for (let k = 0; k < bytes.length; k += 1024) {
+              const chunk = bytes.subarray(k, Math.min(k + 1024, bytes.length))
+              let chunkString = ''
+              for (let i = 0; i < chunk.length; i++) {
+                chunkString += String.fromCharCode(chunk[i])
+              }
+              binaryString += chunkString
             }
-            const base64 = btoa(binary)
+            
+            // 전체 바이너리 문자열을 Base64로 변환
+            const base64 = btoa(binaryString)
             const photoUrl = `data:${photo.type};base64,${base64}`
             const isMain = i === 0
             
@@ -705,7 +724,7 @@ app.post('/api/working-girl/update-profile', async (c) => {
         line_id: jsonData.line_id,
         kakao_id: jsonData.kakao_id,
         phone: jsonData.phone,
-        code: jsonData.code,
+        management_code: jsonData.management_code,
         conditions: jsonData.conditions,
         is_active: jsonData.is_active
       }
@@ -730,7 +749,7 @@ app.post('/api/working-girl/update-profile', async (c) => {
         line_id: formData.get('line_id'),
         kakao_id: formData.get('kakao_id'),
         phone: formData.get('phone'),
-        code: formData.get('code'),
+        management_code: formData.get('management_code'),
         conditions: formData.get('conditions'),
         is_active: formData.get('is_active') === 'true'
       }
@@ -826,17 +845,25 @@ app.post('/api/working-girl/update-profile', async (c) => {
               continue
             }
             
-            // Base64 변환 (Web API 사용 - 더 안전함)
+            // Base64 변환 - 완전히 안전한 방식으로 처리
             const arrayBuffer = await photo.arrayBuffer()
             const bytes = new Uint8Array(arrayBuffer)
             
-            // 바이너리를 Base64로 안전하게 변환
-            let binary = '';
-            const len = bytes.byteLength;
-            for (let j = 0; j < len; j++) {
-              binary += String.fromCharCode(bytes[j]);
+            // 바이너리 데이터를 문자열로 안전하게 변환
+            let binaryString = ''
+            
+            // 작은 청크 단위로 안전하게 처리 (스택 오버플로우 방지)
+            for (let k = 0; k < bytes.length; k += 1024) {
+              const chunk = bytes.subarray(k, Math.min(k + 1024, bytes.length))
+              let chunkString = ''
+              for (let i = 0; i < chunk.length; i++) {
+                chunkString += String.fromCharCode(chunk[i])
+              }
+              binaryString += chunkString
             }
-            const base64 = btoa(binary)
+            
+            // 전체 바이너리 문자열을 Base64로 변환
+            const base64 = btoa(binaryString)
             const photoUrl = `data:${photo.type};base64,${base64}`
             const isMain = i === 0
             
@@ -911,16 +938,26 @@ app.get('/admin', async (c) => {
   // TODO: 관리자 세션 검증 추가 필요
 
   try {
-    // 대시보드 통계 조회
-    const stats = await Promise.all([
-      env.DB.prepare(`SELECT COUNT(*) as count FROM working_girls`).first(),
-      env.DB.prepare(`SELECT COUNT(*) as count FROM working_girls WHERE is_active = 1`).first(),
-      env.DB.prepare(`SELECT COUNT(*) as count FROM working_girls WHERE is_recommended = 1`).first(),
-      env.DB.prepare(`SELECT COUNT(*) as count FROM working_girls WHERE region = '방콕'`).first(),
-      env.DB.prepare(`SELECT COUNT(*) as count FROM working_girls WHERE region = '파타야'`).first(),
-      env.DB.prepare(`SELECT COUNT(*) as count FROM working_girls WHERE region = '치앙마이'`).first(),
-      env.DB.prepare(`SELECT COUNT(*) as count FROM working_girls WHERE region = '푸켓'`).first()
-    ])
+    // 대시보드 통계 조회 (간소화)
+    let stats = [
+      { count: 0 }, { count: 0 }, { count: 0 }, 
+      { count: 0 }, { count: 0 }, { count: 0 }, { count: 0 }
+    ];
+
+    try {
+      stats = await Promise.all([
+        env.DB.prepare(`SELECT COUNT(*) as count FROM working_girls`).first(),
+        env.DB.prepare(`SELECT COUNT(*) as count FROM working_girls WHERE is_active = 1`).first(),
+        env.DB.prepare(`SELECT COUNT(*) as count FROM working_girls WHERE is_recommended = 1`).first(),
+        env.DB.prepare(`SELECT COUNT(*) as count FROM working_girls WHERE region = '방콕'`).first(),
+        env.DB.prepare(`SELECT COUNT(*) as count FROM working_girls WHERE region = '파타야'`).first(),
+        env.DB.prepare(`SELECT COUNT(*) as count FROM working_girls WHERE region = '치앙마이'`).first(),
+        env.DB.prepare(`SELECT COUNT(*) as count FROM working_girls WHERE region = '푸켓'`).first()
+      ]);
+    } catch (error) {
+      console.error('Stats query error:', error);
+      // 기본값 사용
+    }
 
     return c.html(`
       <!DOCTYPE html>
@@ -930,6 +967,21 @@ app.get('/admin', async (c) => {
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <title>타이위키 관리자</title>
           <script src="https://cdn.tailwindcss.com"></script>
+          <script>
+            tailwind.config = {
+              theme: {
+                extend: {
+                  colors: {
+                    thai: {
+                      red: '#ED1C24',
+                      blue: '#241E7E',
+                      white: '#FFFFFF'
+                    }
+                  }
+                }
+              }
+            }
+          </script>
           <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
           <link href="/static/style.css" rel="stylesheet">
       </head>
@@ -1006,8 +1058,8 @@ app.get('/admin', async (c) => {
                       <input type="text" id="admin-search" placeholder="닉네임, 아이디, 지역 등으로 검색..." 
                              class="flex-1 p-3 border border-gray-300 rounded-lg focus:border-thai-blue focus:outline-none">
                       <button onclick="adminSearch()" 
-                              class="bg-thai-blue hover:bg-blue-700 text-white px-6 py-3 rounded-lg">
-                          <i class="fas fa-search mr-2"></i>검색
+                              class="bg-thai-blue hover:bg-blue-700 text-white px-6 py-3 rounded-lg flex items-center justify-center shadow-lg border-2 border-white" style="background-color: #241E7E !important;">
+                          <span class="mr-2 text-lg">🔍</span><span class="text-lg font-bold">검색</span>
                       </button>
                   </div>
               </div>
@@ -1025,7 +1077,8 @@ app.get('/admin', async (c) => {
                       <table class="w-full">
                           <thead class="bg-gray-50">
                               <tr>
-                                  <th class="px-4 py-3 text-left">코드</th>
+                                  <th class="px-4 py-3 text-left">에이전시</th>
+                                  <th class="px-4 py-3 text-left">관리코드</th>
                                   <th class="px-4 py-3 text-left">추천</th>
                                   <th class="px-4 py-3 text-left">거주지역</th>
                                   <th class="px-4 py-3 text-left">아이디</th>
@@ -1035,6 +1088,7 @@ app.get('/admin', async (c) => {
                                   <th class="px-4 py-3 text-left">몸무게</th>
                                   <th class="px-4 py-3 text-left">성별</th>
                                   <th class="px-4 py-3 text-left">상태</th>
+                                  <th class="px-4 py-3 text-left">연락처</th>
                                   <th class="px-4 py-3 text-left">관리</th>
                               </tr>
                           </thead>
@@ -1074,8 +1128,13 @@ app.get('/admin', async (c) => {
                                              class="w-full p-3 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none">
                                   </div>
                                   <div>
-                                      <label class="block text-sm font-medium mb-2">관리 코드</label>
-                                      <input type="text" id="wg_code" name="code" placeholder="VIP001, GOLD003 등"
+                                      <label class="block text-sm font-medium mb-2">관리코드 *</label>
+                                      <input type="text" id="wg_management_code" name="management_code" required placeholder="VIP001, GOLD003 등"
+                                             class="w-full p-3 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none">
+                                  </div>
+                                  <div>
+                                      <label class="block text-sm font-medium mb-2">에이전시</label>
+                                      <input type="text" id="wg_agency" name="agency" placeholder="에이전시명을 입력하세요"
                                              class="w-full p-3 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none">
                                   </div>
                                   <div>
@@ -1135,6 +1194,17 @@ app.get('/admin', async (c) => {
                                           <input type="text" id="wg_wechat_id" name="wechat_id"
                                                  class="w-full p-3 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none">
                                       </div>
+                                  </div>
+                              </div>
+
+                              <!-- 조건 섹션 -->
+                              <div class="border-t pt-6">
+                                  <h4 class="text-lg font-medium mb-4">조건</h4>
+                                  <div>
+                                      <label class="block text-sm font-medium mb-2">서비스 조건</label>
+                                      <textarea id="wg_conditions" name="conditions" rows="4"
+                                                class="w-full p-3 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none resize-vertical"
+                                                placeholder="서비스 조건을 입력해주세요..."></textarea>
                                   </div>
                               </div>
 
@@ -1209,7 +1279,25 @@ app.get('/admin', async (c) => {
                   
                   <!-- 광고 업로드 -->
                   <div class="mb-6 p-4 border-2 border-dashed border-gray-300 rounded-lg">
-                      <input type="file" id="ad-upload" accept="image/*" class="mb-2">
+                      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
+                          <div>
+                              <label class="block text-sm font-medium mb-2">광고 제목 (선택사항)</label>
+                              <input type="text" id="ad-title" placeholder="광고 제목을 입력하세요" 
+                                     class="w-full p-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none">
+                          </div>
+                          <div>
+                              <label class="block text-sm font-medium mb-2">링크 URL (선택사항)</label>
+                              <input type="url" id="ad-link" placeholder="https://example.com" 
+                                     class="w-full p-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none">
+                              <p class="text-xs text-gray-500 mt-1">광고 클릭 시 이동할 페이지 주소</p>
+                          </div>
+                      </div>
+                      <div class="mb-3">
+                          <label class="block text-sm font-medium mb-2">광고 이미지 *</label>
+                          <input type="file" id="ad-upload" accept="image/*" 
+                                 class="w-full p-2 border border-gray-300 rounded-lg">
+                          <p class="text-xs text-gray-500 mt-1">최대 10MB, 이미지 파일만 업로드 가능</p>
+                      </div>
                       <button onclick="uploadAdvertisement()" 
                               class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded">
                           <i class="fas fa-upload mr-2"></i>광고 업로드
@@ -1245,10 +1333,17 @@ app.post('/api/admin/working-girls', async (c) => {
     const user_id = formData.get('username')?.toString()
     const nickname = formData.get('nickname')?.toString()
     const region = formData.get('region')?.toString()
+    const management_code = formData.get('management_code')?.toString()
     const password = formData.get('password')?.toString() || '1234'
     
-    if (!user_id || !nickname || !region) {
-      return c.json({ success: false, message: '필수 정보가 누락되었습니다.' }, 400)
+    if (!user_id || !nickname || !region || !management_code) {
+      return c.json({ success: false, message: '필수 정보가 누락되었습니다. (아이디, 닉네임, 지역, 관리코드는 필수입니다.)' }, 400)
+    }
+
+    // 관리코드 중복 체크
+    const existingCode = await env.DB.prepare(`SELECT id FROM working_girls WHERE management_code = ?`).bind(management_code).first()
+    if (existingCode) {
+      return c.json({ success: false, message: '이미 존재하는 관리코드입니다.' }, 400)
     }
 
     // 중복 아이디 체크
@@ -1269,8 +1364,8 @@ app.post('/api/admin/working-girls', async (c) => {
     const result = await env.DB.prepare(`
       INSERT INTO working_girls (
         user_id, password, nickname, age, height, weight, gender, region,
-        phone, line_id, kakao_id, code, is_recommended, is_active
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        phone, line_id, kakao_id, management_code, agency, conditions, is_recommended, is_active
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       user_id,
       password,
@@ -1283,7 +1378,9 @@ app.post('/api/admin/working-girls', async (c) => {
       formData.get('phone')?.toString() || '',
       formData.get('line_id')?.toString() || '',
       formData.get('wechat_id')?.toString() || '', // kakao_id로 저장
-      formData.get('code')?.toString() || '',
+      management_code,
+      formData.get('agency')?.toString() || '',
+      formData.get('conditions')?.toString() || '',
       formData.get('is_recommended') === 'true' ? 1 : 0,
       formData.get('is_active') !== 'false' ? 1 : 0
     ).run()
@@ -1307,15 +1404,24 @@ app.post('/api/admin/working-girls', async (c) => {
 
           const buffer = await photoFile.arrayBuffer()
           
-          // 안전한 Base64 인코딩 (큰 파일에 대한 스택 오버플로 방지)
+          // 완전히 안전한 Base64 인코딩 방식
           const uint8Array = new Uint8Array(buffer)
-          let base64 = ''
-          const chunkSize = 8192 // 8KB 청크로 나누어 처리
           
-          for (let i = 0; i < uint8Array.length; i += chunkSize) {
-            const chunk = uint8Array.subarray(i, i + chunkSize)
-            base64 += btoa(String.fromCharCode.apply(null, Array.from(chunk)))
+          // 바이너리 데이터를 문자열로 안전하게 변환
+          let binaryString = ''
+          
+          // 작은 청크 단위로 안전하게 처리 (스택 오버플로우 방지)
+          for (let i = 0; i < uint8Array.length; i += 1024) {
+            const chunk = uint8Array.subarray(i, Math.min(i + 1024, uint8Array.length))
+            let chunkString = ''
+            for (let j = 0; j < chunk.length; j++) {
+              chunkString += String.fromCharCode(chunk[j])
+            }
+            binaryString += chunkString
           }
+          
+          // 전체 바이너리 문자열을 Base64로 변환
+          const base64 = btoa(binaryString)
           
           const mimeType = photoFile.type
           const dataUrl = `data:${mimeType};base64,${base64}`
@@ -1384,11 +1490,23 @@ app.put('/api/admin/working-girls/:id', async (c) => {
     }
     const gender = genderMap[formData.get('gender')?.toString() || 'female'] || existingGirl.gender
 
+    // 관리코드 필수 검증 및 중복 확인
+    const management_code = formData.get('management_code')?.toString()
+    if (!management_code) {
+      return c.json({ success: false, message: '관리코드는 필수입니다.' }, 400)
+    }
+
+    // 관리코드 중복 체크 (자기 자신 제외)
+    const existingCode = await env.DB.prepare(`SELECT id FROM working_girls WHERE management_code = ? AND id != ?`).bind(management_code, workingGirlId).first()
+    if (existingCode) {
+      return c.json({ success: false, message: '이미 존재하는 관리코드입니다.' }, 400)
+    }
+
     // 워킹걸 정보 업데이트
     await env.DB.prepare(`
       UPDATE working_girls SET
         user_id = ?, nickname = ?, age = ?, height = ?, weight = ?,
-        gender = ?, region = ?, phone = ?, line_id = ?, kakao_id = ?, code = ?,
+        gender = ?, region = ?, phone = ?, line_id = ?, kakao_id = ?, management_code = ?, agency = ?, conditions = ?,
         is_recommended = ?, is_active = ?
       WHERE id = ?
     `).bind(
@@ -1402,7 +1520,9 @@ app.put('/api/admin/working-girls/:id', async (c) => {
       formData.get('phone')?.toString() || existingGirl.phone || '',
       formData.get('line_id')?.toString() || existingGirl.line_id || '',
       formData.get('wechat_id')?.toString() || existingGirl.kakao_id || '',
-      formData.get('code')?.toString() || existingGirl.code || '',
+      management_code,
+      formData.get('agency')?.toString() || existingGirl.agency || '',
+      formData.get('conditions')?.toString() || existingGirl.conditions || '',
       formData.get('is_recommended') === 'true' ? 1 : 0,
       formData.get('is_active') !== 'false' ? 1 : 0,
       workingGirlId
@@ -1425,15 +1545,24 @@ app.put('/api/admin/working-girls/:id', async (c) => {
 
           const buffer = await photoFile.arrayBuffer()
           
-          // 안전한 Base64 인코딩 (큰 파일에 대한 스택 오버플로 방지)
+          // 완전히 안전한 Base64 인코딩 방식
           const uint8Array = new Uint8Array(buffer)
-          let base64 = ''
-          const chunkSize = 8192 // 8KB 청크로 나누어 처리
           
-          for (let i = 0; i < uint8Array.length; i += chunkSize) {
-            const chunk = uint8Array.subarray(i, i + chunkSize)
-            base64 += btoa(String.fromCharCode.apply(null, Array.from(chunk)))
+          // 바이너리 데이터를 문자열로 안전하게 변환
+          let binaryString = ''
+          
+          // 작은 청크 단위로 안전하게 처리 (스택 오버플로우 방지)
+          for (let i = 0; i < uint8Array.length; i += 1024) {
+            const chunk = uint8Array.subarray(i, Math.min(i + 1024, uint8Array.length))
+            let chunkString = ''
+            for (let j = 0; j < chunk.length; j++) {
+              chunkString += String.fromCharCode(chunk[j])
+            }
+            binaryString += chunkString
           }
+          
+          // 전체 바이너리 문자열을 Base64로 변환
+          const base64 = btoa(binaryString)
           
           const mimeType = photoFile.type
           const dataUrl = `data:${mimeType};base64,${base64}`
@@ -1567,6 +1696,219 @@ app.get('/api/admin/working-girls/:id', async (c) => {
   } catch (error) {
     console.error('Admin working girl detail error:', error)
     return c.json({ success: false, message: '상세 정보 조회 중 오류가 발생했습니다.' }, 500)
+  }
+})
+
+// 광고 업로드 API
+app.post('/api/admin/advertisements', async (c) => {
+  const { env } = c
+  
+  try {
+    const formData = await c.req.formData()
+    const adFile = formData.get('advertisement') as File
+    const title = formData.get('title')?.toString() || ''
+    const linkUrl = formData.get('link_url')?.toString() || ''
+    
+    if (!adFile || adFile.size === 0) {
+      return c.json({ success: false, message: '광고 이미지를 선택해주세요.' }, 400)
+    }
+
+    // 파일 크기 제한 (10MB)
+    if (adFile.size > 10 * 1024 * 1024) {
+      return c.json({ success: false, message: '파일 크기가 너무 큽니다. (최대 10MB)' }, 400)
+    }
+
+    // 이미지 파일 형식 확인
+    if (!adFile.type.startsWith('image/')) {
+      return c.json({ success: false, message: '이미지 파일만 업로드 가능합니다.' }, 400)
+    }
+
+    const buffer = await adFile.arrayBuffer()
+    
+    // Base64 인코딩 (사진 업로드와 동일한 방식)
+    const uint8Array = new Uint8Array(buffer)
+    let binaryString = ''
+    
+    for (let i = 0; i < uint8Array.length; i += 1024) {
+      const chunk = uint8Array.subarray(i, Math.min(i + 1024, uint8Array.length))
+      let chunkString = ''
+      for (let j = 0; j < chunk.length; j++) {
+        chunkString += String.fromCharCode(chunk[j])
+      }
+      binaryString += chunkString
+    }
+    
+    const base64 = btoa(binaryString)
+    const mimeType = adFile.type
+    const dataUrl = `data:${mimeType};base64,${base64}`
+
+    // 현재 최대 순서 가져오기
+    const maxOrderResult = await env.DB.prepare(`
+      SELECT MAX(display_order) as max_order FROM advertisements
+    `).first()
+    
+    const nextOrder = (maxOrderResult?.max_order || 0) + 1
+
+    // 광고 데이터 삽입
+    const result = await env.DB.prepare(`
+      INSERT INTO advertisements (image_url, title, link_url, display_order, is_active)
+      VALUES (?, ?, ?, ?, 1)
+    `).bind(dataUrl, title, linkUrl, nextOrder).run()
+
+    return c.json({ 
+      success: true, 
+      message: '광고가 성공적으로 업로드되었습니다.',
+      advertisementId: result.meta.last_row_id
+    })
+
+  } catch (error) {
+    console.error('Advertisement upload error:', error)
+    return c.json({ success: false, message: '광고 업로드 중 오류가 발생했습니다.' }, 500)
+  }
+})
+
+// 관리자용 광고 목록 조회 API
+app.get('/api/admin/advertisements', async (c) => {
+  const { env } = c
+  
+  try {
+    const ads = await env.DB.prepare(`
+      SELECT * FROM advertisements 
+      ORDER BY display_order ASC, created_at DESC
+    `).all()
+
+    return c.json({ 
+      success: true, 
+      advertisements: ads.results || []
+    })
+    
+  } catch (error) {
+    console.error('Advertisement list error:', error)
+    return c.json({ success: false, message: '광고 목록 조회 중 오류가 발생했습니다.' }, 500)
+  }
+})
+
+// 메인 페이지용 활성 광고 목록 조회 API
+app.get('/api/advertisements', async (c) => {
+  const { env } = c
+  
+  try {
+    const activeAds = await env.DB.prepare(`
+      SELECT id, image_url, title, link_url, display_order 
+      FROM advertisements 
+      WHERE is_active = 1 
+      ORDER BY display_order ASC
+    `).all()
+
+    return c.json({ 
+      success: true, 
+      advertisements: activeAds.results || []
+    })
+    
+  } catch (error) {
+    console.error('Active advertisements error:', error)
+    return c.json({ success: false, message: '광고 조회 중 오류가 발생했습니다.' }, 500)
+  }
+})
+
+// 광고 삭제 API
+app.delete('/api/admin/advertisements/:id', async (c) => {
+  const { env } = c
+  const adId = c.req.param('id')
+  
+  try {
+    const result = await env.DB.prepare(`
+      DELETE FROM advertisements WHERE id = ?
+    `).bind(adId).run()
+
+    if (result.changes === 0) {
+      return c.json({ success: false, message: '존재하지 않는 광고입니다.' }, 404)
+    }
+
+    return c.json({ 
+      success: true, 
+      message: '광고가 성공적으로 삭제되었습니다.'
+    })
+    
+  } catch (error) {
+    console.error('Advertisement deletion error:', error)
+    return c.json({ success: false, message: '광고 삭제 중 오류가 발생했습니다.' }, 500)
+  }
+})
+
+// 광고 정보 업데이트 API
+app.put('/api/admin/advertisements/:id', async (c) => {
+  const { env } = c
+  const adId = c.req.param('id')
+  
+  try {
+    const { title, link_url } = await c.req.json()
+    
+    const result = await env.DB.prepare(`
+      UPDATE advertisements SET title = ?, link_url = ? WHERE id = ?
+    `).bind(title || '', link_url || '', adId).run()
+
+    if (result.changes === 0) {
+      return c.json({ success: false, message: '존재하지 않는 광고입니다.' }, 404)
+    }
+
+    return c.json({ 
+      success: true, 
+      message: '광고 정보가 성공적으로 업데이트되었습니다.'
+    })
+    
+  } catch (error) {
+    console.error('Advertisement update error:', error)
+    return c.json({ success: false, message: '광고 정보 업데이트 중 오류가 발생했습니다.' }, 500)
+  }
+})
+
+// 광고 활성화/비활성화 토글 API
+app.put('/api/admin/advertisements/:id/toggle', async (c) => {
+  const { env } = c
+  const adId = c.req.param('id')
+  
+  try {
+    const { is_active } = await c.req.json()
+    
+    const result = await env.DB.prepare(`
+      UPDATE advertisements SET is_active = ? WHERE id = ?
+    `).bind(is_active ? 1 : 0, adId).run()
+
+    if (result.changes === 0) {
+      return c.json({ success: false, message: '존재하지 않는 광고입니다.' }, 404)
+    }
+
+    return c.json({ 
+      success: true, 
+      message: `광고가 ${is_active ? '활성화' : '비활성화'}되었습니다.`
+    })
+    
+  } catch (error) {
+    console.error('Advertisement toggle error:', error)
+    return c.json({ success: false, message: '광고 상태 변경 중 오류가 발생했습니다.' }, 500)
+  }
+})
+
+// 테스트 광고 데이터 정리 API (개발용)
+app.delete('/api/admin/advertisements/cleanup', async (c) => {
+  const { env } = c
+  
+  try {
+    // 파일 경로를 참조하는 광고들 삭제
+    const result = await env.DB.prepare(`
+      DELETE FROM advertisements 
+      WHERE image_url LIKE '/static/ads/%' OR image_url NOT LIKE 'data:%'
+    `).run()
+
+    return c.json({ 
+      success: true, 
+      message: `${result.changes}개의 테스트 광고가 정리되었습니다.`
+    })
+    
+  } catch (error) {
+    console.error('Advertisement cleanup error:', error)
+    return c.json({ success: false, message: '광고 정리 중 오류가 발생했습니다.' }, 500)
   }
 })
 

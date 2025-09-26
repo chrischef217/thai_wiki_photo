@@ -381,6 +381,16 @@ function showWorkingGirlModal(girl) {
                         </div>
                     </div>
 
+                    ${girl.conditions && girl.conditions.trim() !== '' ? `
+                    <!-- 조건 정보 -->
+                    <div class="mb-6">
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <h4 class="font-semibold text-gray-800 mb-3">조건</h4>
+                            <div class="text-gray-700 whitespace-pre-line">${girl.conditions}</div>
+                        </div>
+                    </div>
+                    ` : ''}
+
                     <!-- 만남 요청 버튼 -->
                     <div class="mt-6 text-center">
                         <button onclick="requestMeeting(${girl.id})" class="bg-thai-red hover:bg-red-600 text-white px-8 py-3 rounded-lg text-lg font-medium transition-colors duration-200">
@@ -1016,11 +1026,27 @@ function setupAdSlider() {
     const adSlider = document.getElementById('ad-slider');
     
     // 광고 HTML 생성
-    const adsHTML = advertisementsData.map(ad => `
-        <div class="min-w-full h-full flex items-center justify-center ad-slide">
-            <img src="${ad.image_url}" alt="${ad.title || '광고'}" class="h-full w-auto object-contain" onerror="this.style.display='none'">
-        </div>
-    `).join('');
+    const adsHTML = advertisementsData.map((ad, index) => {
+        const imgElement = `<img src="${ad.image_url}" alt="${ad.title || '광고'}" class="h-full w-auto object-contain" onerror="this.style.display='none'">`;
+        
+        if (ad.link_url && ad.link_url.trim()) {
+            // 링크가 있는 경우 클릭 가능한 요소로 래핑
+            return `
+                <div class="min-w-full h-full flex items-center justify-center ad-slide">
+                    <a href="${ad.link_url}" target="_blank" rel="noopener noreferrer" class="h-full flex items-center justify-center cursor-pointer" title="광고 페이지로 이동">
+                        ${imgElement}
+                    </a>
+                </div>
+            `;
+        } else {
+            // 링크가 없는 경우 일반 이미지
+            return `
+                <div class="min-w-full h-full flex items-center justify-center ad-slide">
+                    ${imgElement}
+                </div>
+            `;
+        }
+    }).join('');
     
     adSlider.innerHTML = adsHTML;
 
