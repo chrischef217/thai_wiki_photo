@@ -1600,24 +1600,48 @@ app.post('/api/admin/working-girls', async (c) => {
           const mimeType = photoFile.type
           const dataUrl = `data:${mimeType};base64,${base64}`
           
-          await env.DB.prepare(`
+          // 사진을 데이터베이스에 삽입 (메인 사진 설정은 나중에)
+          const photoResult = await env.DB.prepare(`
             INSERT INTO working_girl_photos (working_girl_id, photo_url, is_main, upload_order)
             VALUES (?, ?, ?, ?)
-          `).bind(workingGirlId, dataUrl, photoIndex === 0 ? 1 : 0, photoIndex + 1).run()
+          `).bind(workingGirlId, dataUrl, 0, photoIndex + 1).run()
           
-          // 첫 번째 사진을 메인 사진으로 설정
-          if (photoIndex === 0) {
-            await env.DB.prepare(`
-              UPDATE working_girls SET main_photo = ? WHERE id = ?
-            `).bind(dataUrl, workingGirlId).run()
-          }
-          
-          photos.push({ order: photoIndex + 1, url: dataUrl })
+          photos.push({ 
+            id: photoResult.meta.last_row_id,
+            order: photoIndex + 1, 
+            url: dataUrl 
+          })
         } catch (photoError) {
           console.error(`Error processing photo ${photoIndex}:`, photoError)
         }
       }
       photoIndex++
+    }
+
+    // 메인 사진 처리
+    const mainPhotoId = formData.get('main_photo_id')?.toString()
+    if (mainPhotoId && photos.length > 0) {
+      // 선택된 사진을 메인 사진으로 설정
+      const selectedPhoto = photos.find(p => p.id?.toString() === mainPhotoId)
+      if (selectedPhoto) {
+        await env.DB.prepare(`
+          UPDATE working_girl_photos SET is_main = 1 WHERE id = ?
+        `).bind(mainPhotoId).run()
+        
+        await env.DB.prepare(`
+          UPDATE working_girls SET main_photo = ? WHERE id = ?
+        `).bind(selectedPhoto.url, workingGirlId).run()
+      }
+    } else if (photos.length > 0) {
+      // 메인 사진이 선택되지 않은 경우 첫 번째 사진을 메인으로 설정
+      const firstPhoto = photos[0]
+      await env.DB.prepare(`
+        UPDATE working_girl_photos SET is_main = 1 WHERE id = ?
+      `).bind(firstPhoto.id).run()
+      
+      await env.DB.prepare(`
+        UPDATE working_girls SET main_photo = ? WHERE id = ?
+      `).bind(firstPhoto.url, workingGirlId).run()
     }
 
     return c.json({ 
@@ -1772,6 +1796,31 @@ app.put('/api/admin/working-girls/:id', async (c) => {
       for (const photoId of photoIdsToDelete) {
         await env.DB.prepare(`DELETE FROM working_girl_photos WHERE id = ? AND working_girl_id = ?`)
           .bind(photoId.trim(), workingGirlId).run()
+      }
+    }
+
+    // 메인 사진 처리
+    const mainPhotoId = formData.get('main_photo_id')?.toString()
+    if (mainPhotoId) {
+      // 먼저 해당 워킹걸의 모든 사진을 is_main = 0 으로 설정
+      await env.DB.prepare(`
+        UPDATE working_girl_photos SET is_main = 0 WHERE working_girl_id = ?
+      `).bind(workingGirlId).run()
+      
+      // 선택된 사진을 메인 사진으로 설정
+      await env.DB.prepare(`
+        UPDATE working_girl_photos SET is_main = 1 WHERE id = ? AND working_girl_id = ?
+      `).bind(mainPhotoId, workingGirlId).run()
+      
+      // 워킹걸 테이블의 main_photo 필드도 업데이트
+      const mainPhoto = await env.DB.prepare(`
+        SELECT photo_url FROM working_girl_photos WHERE id = ? AND working_girl_id = ?
+      `).bind(mainPhotoId, workingGirlId).first()
+      
+      if (mainPhoto) {
+        await env.DB.prepare(`
+          UPDATE working_girls SET main_photo = ? WHERE id = ?
+        `).bind(mainPhoto.photo_url, workingGirlId).run()
       }
     }
 

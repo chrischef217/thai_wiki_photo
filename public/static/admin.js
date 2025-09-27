@@ -192,21 +192,90 @@ function displayExistingPhotos(photos) {
     }
     
     container.innerHTML = validPhotos.map(photo => `
-        <div class="relative group" data-photo-id="${photo.id}">
+        <div class="relative group border-2 ${photo.is_main ? 'border-blue-500 bg-blue-50' : 'border-gray-200'} rounded-lg p-2" data-photo-id="${photo.id}">
+            <!-- 메인 사진 선택 라디오 버튼 -->
+            <div class="absolute top-1 left-1 z-10">
+                <input type="radio" 
+                       name="main_photo" 
+                       value="${photo.id}" 
+                       ${photo.is_main ? 'checked' : ''}
+                       onchange="setMainPhoto(${photo.id})"
+                       class="w-4 h-4 text-blue-600 bg-white border-2 border-gray-300 focus:ring-blue-500 focus:ring-2">
+            </div>
+            
+            <!-- 메인 사진 표시 -->
+            ${photo.is_main ? '<div class="absolute top-1 left-6 bg-blue-500 text-white text-xs px-2 py-1 rounded font-semibold">메인</div>' : ''}
+            
             <img src="${photo.photo_url}" 
                  alt="워킹걸 사진" 
-                 class="w-full h-24 object-cover rounded border cursor-pointer"
+                 class="w-full h-24 object-cover rounded border cursor-pointer mt-6"
                  onclick="showPhotoLightbox('${photo.photo_url.replace(/'/g, '\\\'').replace(/"/g, '&quot;')}')">
+            
+            <!-- 삭제 버튼 -->
             <button type="button" 
                     onclick="togglePhotoForDeletion(${photo.id})"
-                    class="absolute top-1 right-1 bg-red-500 text-white rounded-full w-6 h-6 text-xs opacity-70 hover:opacity-100 transition-opacity">
+                    class="absolute top-1 right-1 bg-red-500 text-white rounded-full w-6 h-6 text-xs opacity-70 hover:opacity-100 transition-opacity z-10">
                 <i class="fas fa-times"></i>
             </button>
+            
+            <!-- 순서 표시 -->
             <div class="absolute bottom-1 left-1 bg-black bg-opacity-50 text-white text-xs px-1 rounded">
                 #${photo.upload_order}
             </div>
+            
+            <!-- 메인 사진 라벨 -->
+            <div class="text-center mt-1">
+                <label class="text-xs ${photo.is_main ? 'text-blue-600 font-semibold' : 'text-gray-500'}">
+                    메인 사진으로 설정
+                </label>
+            </div>
         </div>
     `).join('');
+}
+
+// 메인 사진 설정
+function setMainPhoto(photoId) {
+    // 모든 사진 컨테이너에서 메인 스타일 제거
+    document.querySelectorAll('[data-photo-id]').forEach(element => {
+        element.classList.remove('border-blue-500', 'bg-blue-50');
+        element.classList.add('border-gray-200');
+        
+        // 메인 라벨 제거
+        const mainLabel = element.querySelector('.bg-blue-500');
+        if (mainLabel) mainLabel.remove();
+        
+        // 라벨 텍스트 스타일 리셋
+        const label = element.querySelector('label');
+        if (label) {
+            label.classList.remove('text-blue-600', 'font-semibold');
+            label.classList.add('text-gray-500');
+        }
+    });
+    
+    // 선택된 사진에 메인 스타일 적용
+    const selectedElement = document.querySelector(`[data-photo-id="${photoId}"]`);
+    if (selectedElement) {
+        selectedElement.classList.remove('border-gray-200');
+        selectedElement.classList.add('border-blue-500', 'bg-blue-50');
+        
+        // 메인 라벨 추가
+        const existingLabel = selectedElement.querySelector('.bg-blue-500');
+        if (!existingLabel) {
+            const mainLabel = document.createElement('div');
+            mainLabel.className = 'absolute top-1 left-6 bg-blue-500 text-white text-xs px-2 py-1 rounded font-semibold';
+            mainLabel.textContent = '메인';
+            selectedElement.appendChild(mainLabel);
+        }
+        
+        // 라벨 텍스트 스타일 변경
+        const label = selectedElement.querySelector('label');
+        if (label) {
+            label.classList.remove('text-gray-500');
+            label.classList.add('text-blue-600', 'font-semibold');
+        }
+    }
+    
+    console.log('메인 사진 설정:', photoId);
 }
 
 // 사진 삭제 토글
@@ -216,11 +285,9 @@ function togglePhotoForDeletion(photoId) {
     if (selectedPhotosToDelete.has(photoId)) {
         selectedPhotosToDelete.delete(photoId);
         photoElement.classList.remove('opacity-50', 'border-red-500');
-        photoElement.classList.add('border-gray-300');
     } else {
         selectedPhotosToDelete.add(photoId);
         photoElement.classList.add('opacity-50', 'border-red-500');
-        photoElement.classList.remove('border-gray-300');
     }
 }
 
@@ -356,6 +423,12 @@ async function handleWorkingGirlSubmit(e) {
     // 삭제할 사진 ID 추가 (수정 모드일 때만)
     if (editingId && selectedPhotosToDelete.size > 0) {
         formData.append('delete_photo_ids', Array.from(selectedPhotosToDelete).join(','));
+    }
+    
+    // 메인 사진 ID 추가
+    const mainPhotoRadio = document.querySelector('input[name="main_photo"]:checked');
+    if (mainPhotoRadio) {
+        formData.append('main_photo_id', mainPhotoRadio.value);
     }
     
     try {
