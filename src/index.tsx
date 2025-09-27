@@ -221,6 +221,12 @@ app.get('/', async (c) => {
         // 컬럼이 이미 존재하는 경우 무시
       }
       
+      try {
+        await env.DB.prepare(`ALTER TABLE working_girls ADD COLUMN fee TEXT`).run()
+      } catch (e) {
+        // 컬럼이 이미 존재하는 경우 무시
+      }
+      
       // 기존 code 컬럼 데이터를 management_code로 복사 (한 번만 실행)
       try {
         await env.DB.prepare(`UPDATE working_girls SET management_code = code WHERE management_code IS NULL AND code IS NOT NULL`).run()
@@ -452,58 +458,123 @@ app.get('/', async (c) => {
 
 // API 라우트들
 
-// 워킹걸 리스트 조회
+// 워킹걸 리스트 조회 (최적화된 버전)
 app.get('/api/working-girls', async (c) => {
   const { env } = c
 
   try {
-    // 워킹걸 기본 정보만 먼저 조회 (패스워드 제외)
+    console.log('Main page working girls request received')
+    
+    if (!env.DB) {
+      console.error('Database connection not available')
+      return c.json({ success: false, error: '데이터베이스 연결 오류' }, 500)
+    }
+
+    // 페이지네이션 파라미터
+    const page = parseInt(c.req.query('page') || '1')
+    const limit = parseInt(c.req.query('limit') || '20')
+    const offset = (page - 1) * limit
+    
+    console.log('Pagination params - page:', page, 'limit:', limit, 'offset:', offset)
+    
+    // 워킹걸 기본 정보 조회 (페이지네이션 적용)
     const girlsResult = await env.DB.prepare(`
       SELECT id, user_id, nickname, age, height, weight, gender, region, 
-             line_id, kakao_id, phone, management_code, agency, conditions, 
+             line_id, kakao_id, phone, management_code, agency, fee, conditions, 
              main_photo, is_active, is_recommended, created_at, updated_at
       FROM working_girls 
       WHERE is_active = 1
       ORDER BY is_recommended DESC, created_at DESC
-    `).all()
+      LIMIT ? OFFSET ?
+    `).bind(limit, offset).all()
+    
+    console.log('Working girls query completed, count:', girlsResult?.results?.length || 0)
 
-    const workingGirls = []
+    const workingGirlsData = girlsResult.results || []
+    
+    if (workingGirlsData.length === 0) {
+      return c.json({ success: true, working_girls: [] })
+    }
 
-    // 각 워킹걸의 사진을 개별적으로 조회
-    for (const girl of girlsResult.results || []) {
-      const photosResult = await env.DB.prepare(`
-        SELECT id, photo_url, is_main, upload_order 
-        FROM working_girl_photos 
-        WHERE working_girl_id = ? 
-        ORDER BY upload_order ASC
-      `).bind(girl.id).all()
+    // 모든 워킹걸의 사진을 한 번에 조회 (성능 최적화)
+    const workingGirlIds = workingGirlsData.map(girl => girl.id)
+    const placeholders = workingGirlIds.map(() => '?').join(',')
+    
+    const photosResult = await env.DB.prepare(`
+      SELECT working_girl_id, id, photo_url, is_main, upload_order 
+      FROM working_girl_photos 
+      WHERE working_girl_id IN (${placeholders})
+      ORDER BY working_girl_id, upload_order ASC
+    `).bind(...workingGirlIds).all()
+    
+    console.log('Photos query completed, count:', photosResult?.results?.length || 0)
 
-      workingGirls.push({
-        ...girl,
-        photos: photosResult.results || []
+    // 사진들을 working_girl_id별로 그룹화
+    const photosMap = {}
+    for (const photo of (photosResult.results || [])) {
+      if (!photosMap[photo.working_girl_id]) {
+        photosMap[photo.working_girl_id] = []
+      }
+      photosMap[photo.working_girl_id].push({
+        id: photo.id,
+        photo_url: photo.photo_url,
+        is_main: photo.is_main,
+        upload_order: photo.upload_order
       })
     }
 
-    return c.json({ success: true, working_girls: workingGirls })
+    // 최종 데이터 조합
+    const workingGirls = workingGirlsData.map(girl => ({
+      ...girl,
+      photos: photosMap[girl.id] || []
+    }))
+    
+    console.log(`Returning ${workingGirls.length} working girls to main page (page ${page})`)
+
+    return c.json({ 
+      success: true, 
+      working_girls: workingGirls,
+      pagination: {
+        page: page,
+        limit: limit,
+        count: workingGirls.length,
+        hasMore: workingGirls.length === limit
+      }
+    })
   } catch (error) {
-    console.error('Database error:', error)
-    return c.json({ success: false, error: 'Database error' }, 500)
+    console.error('Main page database error:', error)
+    console.error('Error details:', {
+      message: error.message,
+      stack: error.stack
+    })
+    return c.json({ success: false, error: `데이터베이스 오류: ${error.message}` }, 500)
   }
 })
 
-// 워킹걸 검색
+// 워킹걸 검색 (최적화된 버전)
 app.get('/api/working-girls/search', async (c) => {
   const { env } = c
   const query = c.req.query('q') || ''
 
   try {
+    console.log('Search request received, query:', query)
+    
+    if (!env.DB) {
+      return c.json({ success: false, error: '데이터베이스 연결 오류' }, 500)
+    }
+
+    // 페이지네이션 파라미터
+    const page = parseInt(c.req.query('page') || '1')
+    const limit = parseInt(c.req.query('limit') || '20')
+    const offset = (page - 1) * limit
+    
     const searchPattern = `%${query}%`
     const girlsResult = await env.DB.prepare(`
       SELECT id, user_id, nickname, age, height, weight, gender, region, 
-             line_id, kakao_id, phone, management_code, agency, conditions, 
+             line_id, kakao_id, phone, management_code, agency, fee, conditions, 
              main_photo, is_active, is_recommended, created_at, updated_at
       FROM working_girls 
-      WHERE (
+      WHERE is_active = 1 AND (
         nickname LIKE ? OR
         region LIKE ? OR
         gender LIKE ? OR
@@ -511,29 +582,63 @@ app.get('/api/working-girls/search', async (c) => {
         CAST(age AS TEXT) LIKE ?
       )
       ORDER BY is_recommended DESC, created_at DESC
-    `).bind(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern).all()
+      LIMIT ? OFFSET ?
+    `).bind(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, limit, offset).all()
+    
+    console.log('Search query completed, count:', girlsResult?.results?.length || 0)
 
-    const workingGirls = []
+    const workingGirlsData = girlsResult.results || []
+    
+    if (workingGirlsData.length === 0) {
+      return c.json({ success: true, working_girls: [] })
+    }
 
-    // 각 워킹걸의 사진을 개별적으로 조회
-    for (const girl of girlsResult.results || []) {
-      const photosResult = await env.DB.prepare(`
-        SELECT id, photo_url, is_main, upload_order 
-        FROM working_girl_photos 
-        WHERE working_girl_id = ? 
-        ORDER BY upload_order ASC
-      `).bind(girl.id).all()
+    // 모든 검색 결과의 사진을 한 번에 조회
+    const workingGirlIds = workingGirlsData.map(girl => girl.id)
+    const placeholders = workingGirlIds.map(() => '?').join(',')
+    
+    const photosResult = await env.DB.prepare(`
+      SELECT working_girl_id, id, photo_url, is_main, upload_order 
+      FROM working_girl_photos 
+      WHERE working_girl_id IN (${placeholders})
+      ORDER BY working_girl_id, upload_order ASC
+    `).bind(...workingGirlIds).all()
 
-      workingGirls.push({
-        ...girl,
-        photos: photosResult.results || []
+    // 사진들을 working_girl_id별로 그룹화
+    const photosMap = {}
+    for (const photo of (photosResult.results || [])) {
+      if (!photosMap[photo.working_girl_id]) {
+        photosMap[photo.working_girl_id] = []
+      }
+      photosMap[photo.working_girl_id].push({
+        id: photo.id,
+        photo_url: photo.photo_url,
+        is_main: photo.is_main,
+        upload_order: photo.upload_order
       })
     }
 
-    return c.json({ success: true, working_girls: workingGirls })
+    // 최종 데이터 조합
+    const workingGirls = workingGirlsData.map(girl => ({
+      ...girl,
+      photos: photosMap[girl.id] || []
+    }))
+    
+    console.log(`Returning ${workingGirls.length} search results (page ${page})`)
+
+    return c.json({ 
+      success: true, 
+      working_girls: workingGirls,
+      pagination: {
+        page: page,
+        limit: limit,
+        count: workingGirls.length,
+        hasMore: workingGirls.length === limit
+      }
+    })
   } catch (error) {
-    console.error('Database error:', error)
-    return c.json({ success: false, error: 'Database error' }, 500)
+    console.error('Search database error:', error)
+    return c.json({ success: false, error: `검색 오류: ${error.message}` }, 500)
   }
 })
 
@@ -603,7 +708,7 @@ app.post('/api/auth/working-girl/register', async (c) => {
       line_id: formData.get('line_id'),
       kakao_id: formData.get('kakao_id'),
       phone: formData.get('phone'),
-      code: formData.get('code'),
+      management_code: formData.get('management_code'),
       conditions: formData.get('conditions'),
       is_active: formData.get('is_active') === 'true'
     }
@@ -621,12 +726,12 @@ app.post('/api/auth/working-girl/register', async (c) => {
     const insertResult = await env.DB.prepare(`
       INSERT INTO working_girls (
         user_id, password, nickname, age, height, weight, gender, region,
-        line_id, kakao_id, phone, code, conditions, is_active
+        line_id, kakao_id, phone, management_code, conditions, is_active
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       userData.user_id, userData.password, userData.nickname, userData.age,
       userData.height, userData.weight, userData.gender, userData.region,
-      userData.line_id, userData.kakao_id, userData.phone, userData.code,
+      userData.line_id, userData.kakao_id, userData.phone, userData.management_code,
       userData.conditions, userData.is_active
     ).run()
 
@@ -840,7 +945,7 @@ app.get('/api/working-girl/profile', async (c) => {
     // 워킹걸 정보 조회
     const workingGirl = await env.DB.prepare(`
       SELECT id, user_id, nickname, age, height, weight, gender, region, 
-             line_id, kakao_id, phone, code, conditions, main_photo, is_active, is_recommended
+             line_id, kakao_id, phone, management_code, conditions, main_photo, is_active, is_recommended
       FROM working_girls WHERE id = ?
     `).bind(session.user_id).first()
     
@@ -966,28 +1071,28 @@ app.post('/api/working-girl/update-profile', async (c) => {
       updateQuery = `
         UPDATE working_girls SET
           nickname = ?, age = ?, height = ?, weight = ?, gender = ?, region = ?,
-          line_id = ?, kakao_id = ?, phone = ?, code = ?, conditions = ?, password = ?, is_active = ?,
+          line_id = ?, kakao_id = ?, phone = ?, management_code = ?, conditions = ?, password = ?, is_active = ?,
           updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
       `
       updateParams = [
         userData.nickname, userData.age, userData.height, userData.weight,
         userData.gender, userData.region, userData.line_id, userData.kakao_id,
-        userData.phone, userData.code, userData.conditions, newPassword, userData.is_active, workingGirlId
+        userData.phone, userData.management_code, userData.conditions, newPassword, userData.is_active, workingGirlId
       ]
     } else {
       // 비밀번호 제외 업데이트
       updateQuery = `
         UPDATE working_girls SET
           nickname = ?, age = ?, height = ?, weight = ?, gender = ?, region = ?,
-          line_id = ?, kakao_id = ?, phone = ?, code = ?, conditions = ?, is_active = ?,
+          line_id = ?, kakao_id = ?, phone = ?, management_code = ?, conditions = ?, is_active = ?,
           updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
       `
       updateParams = [
         userData.nickname, userData.age, userData.height, userData.weight,
         userData.gender, userData.region, userData.line_id, userData.kakao_id,
-        userData.phone, userData.code, userData.conditions, userData.is_active, workingGirlId
+        userData.phone, userData.management_code, userData.conditions, userData.is_active, workingGirlId
       ]
     }
 
@@ -1301,6 +1406,7 @@ app.get('/admin', async (c) => {
                                       <input type="text" id="wg_nickname" name="nickname" required
                                              class="w-full p-3 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none">
                                   </div>
+
                                   <div>
                                       <label class="block text-sm font-medium mb-2">관리코드 *</label>
                                       <input type="text" id="wg_management_code" name="management_code" required placeholder="VIP001, GOLD003 등"
@@ -1374,6 +1480,12 @@ app.get('/admin', async (c) => {
                               <!-- 조건 섹션 -->
                               <div class="border-t pt-6">
                                   <h4 class="text-lg font-medium mb-4">조건</h4>
+                                  <div class="mb-4">
+                                      <label class="block text-sm font-medium mb-2">워킹걸 페이</label>
+                                      <textarea id="wg_fee" name="fee" rows="3"
+                                                class="w-full p-3 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none resize-vertical"
+                                                placeholder="워킹걸 페이 정보를 입력해주세요..."></textarea>
+                                  </div>
                                   <div>
                                       <label class="block text-sm font-medium mb-2">서비스 조건</label>
                                       <textarea id="wg_conditions" name="conditions" rows="4"
@@ -1487,6 +1599,7 @@ app.get('/admin', async (c) => {
 
           <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
           <script src="/static/admin.js"></script>
+          <script src="/static/admin-photo.js"></script>
       </body>
       </html>
     `)
@@ -1496,22 +1609,136 @@ app.get('/admin', async (c) => {
   }
 })
 
+// 데이터베이스 연결 테스트 API
+app.get('/api/test/db', async (c) => {
+  const { env } = c
+  
+  try {
+    if (!env.DB) {
+      return c.json({ success: false, message: '데이터베이스 연결 없음' })
+    }
+    
+    // 간단한 쿼리 테스트
+    const result = await env.DB.prepare('SELECT COUNT(*) as count FROM working_girls').first()
+    
+    return c.json({ 
+      success: true, 
+      message: '데이터베이스 연결 성공',
+      count: result?.count || 0
+    })
+    
+  } catch (error) {
+    return c.json({ 
+      success: false, 
+      message: `데이터베이스 오류: ${error.message}`
+    })
+  }
+})
+
+// 단일 사진 업로드 API
+app.post('/api/admin/upload-single-photo', async (c) => {
+  const { env } = c
+  
+  try {
+    const formData = await c.req.formData()
+    const workingGirlId = formData.get('working_girl_id')?.toString()
+    const photoFile = formData.get('photo') as File
+    const uploadOrder = parseInt(formData.get('upload_order')?.toString() || '1')
+    const isMain = formData.get('is_main') === '1'
+    
+    if (!workingGirlId || !photoFile) {
+      return c.json({ success: false, message: '필수 정보가 누락되었습니다.' }, 400)
+    }
+    
+    // 워킹걸 존재 확인
+    const workingGirl = await env.DB.prepare(`SELECT id FROM working_girls WHERE id = ?`).bind(workingGirlId).first()
+    if (!workingGirl) {
+      return c.json({ success: false, message: '워킹걸을 찾을 수 없습니다.' }, 404)
+    }
+    
+    // 파일 크기 체크 (3MB)
+    if (photoFile.size > 3 * 1024 * 1024) {
+      return c.json({ success: false, message: '사진 크기가 너무 큽니다. (최대 3MB)' }, 400)
+    }
+    
+    // MIME 타입 체크
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif']
+    if (!allowedTypes.includes(photoFile.type)) {
+      return c.json({ success: false, message: '지원하지 않는 이미지 형식입니다.' }, 400)
+    }
+    
+    // Base64 변환
+    const arrayBuffer = await photoFile.arrayBuffer()
+    const bytes = new Uint8Array(arrayBuffer)
+    
+    let binaryString = ''
+    for (let k = 0; k < bytes.length; k += 1024) {
+      const chunk = bytes.subarray(k, Math.min(k + 1024, bytes.length))
+      let chunkString = ''
+      for (let i = 0; i < chunk.length; i++) {
+        chunkString += String.fromCharCode(chunk[i])
+      }
+      binaryString += chunkString
+    }
+    
+    const base64 = btoa(binaryString)
+    const photoUrl = `data:${photoFile.type};base64,${base64}`
+    
+    // 사진 저장
+    const result = await env.DB.prepare(`
+      INSERT INTO working_girl_photos (working_girl_id, photo_url, is_main, upload_order)
+      VALUES (?, ?, ?, ?)
+    `).bind(workingGirlId, photoUrl, isMain ? 1 : 0, uploadOrder).run()
+    
+    // 메인 사진이면 working_girls 테이블 업데이트
+    if (isMain) {
+      await env.DB.prepare(`UPDATE working_girls SET main_photo = ? WHERE id = ?`)
+        .bind(photoUrl, workingGirlId).run()
+    }
+    
+    return c.json({ 
+      success: true, 
+      message: '사진이 성공적으로 업로드되었습니다.',
+      photoId: result.meta.last_row_id
+    })
+    
+  } catch (error) {
+    console.error('Single photo upload error:', error)
+    return c.json({ success: false, message: '사진 업로드 중 오류가 발생했습니다.' }, 500)
+  }
+})
+
 // 관리자용 워킹걸 등록 API
 app.post('/api/admin/working-girls', async (c) => {
   const { env } = c
   
   try {
+    console.log('Admin registration request received')
     const formData = await c.req.formData()
     
+    // FormData 내용 디버깅
+    console.log('FormData keys:', Array.from(formData.keys()))
+    for (const [key, value] of formData.entries()) {
+      if (value instanceof File) {
+        console.log(`${key}: File(${value.name}, ${value.size} bytes)`)
+      } else {
+        console.log(`${key}: ${value}`)
+      }
+    }
+    
     // 필수 필드 검증
-    const user_id = formData.get('username')?.toString()
-    const nickname = formData.get('nickname')?.toString()
-    const region = formData.get('region')?.toString()
-    const management_code = formData.get('management_code')?.toString()
-    const password = formData.get('password')?.toString() || '1234'
+    const user_id = formData.get('username')?.toString()?.trim()
+    const nickname = formData.get('nickname')?.toString()?.trim()
+    const region = formData.get('region')?.toString()?.trim()
+    const management_code = formData.get('management_code')?.toString()?.trim()
+    const password = formData.get('password')?.toString()?.trim() || '1234'
     
     if (!user_id || !nickname || !region || !management_code) {
-      return c.json({ success: false, message: '필수 정보가 누락되었습니다. (아이디, 닉네임, 지역, 관리코드는 필수입니다.)' }, 400)
+      console.log('Missing required fields:', { user_id, nickname, region, management_code })
+      return c.json({ 
+        success: false, 
+        message: `필수 정보가 누락되었습니다. 아이디: ${user_id || '없음'}, 닉네임: ${nickname || '없음'}, 지역: ${region || '없음'}, 관리코드: ${management_code || '없음'}` 
+      }, 400)
     }
 
     // 관리코드 중복 체크
@@ -1538,8 +1765,8 @@ app.post('/api/admin/working-girls', async (c) => {
     const result = await env.DB.prepare(`
       INSERT INTO working_girls (
         user_id, password, nickname, age, height, weight, gender, region,
-        phone, line_id, kakao_id, management_code, agency, conditions, is_recommended, is_active
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        phone, line_id, kakao_id, management_code, agency, fee, conditions, is_recommended, is_active
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       user_id,
       password,
@@ -1554,6 +1781,7 @@ app.post('/api/admin/working-girls', async (c) => {
       formData.get('wechat_id')?.toString() || '', // kakao_id로 저장
       management_code,
       formData.get('agency')?.toString() || '',
+      formData.get('fee')?.toString() || '',
       formData.get('conditions')?.toString() || '',
       formData.get('is_recommended') === 'true' ? 1 : 0,
       formData.get('is_active') !== 'false' ? 1 : 0
@@ -1561,70 +1789,10 @@ app.post('/api/admin/working-girls', async (c) => {
 
     const workingGirlId = result.meta.last_row_id
 
-    // 사진 처리
-    const photos = []
-    let photoIndex = 0
-    
-    while (formData.get(`photo_${photoIndex}`)) {
-      const photoFile = formData.get(`photo_${photoIndex}`) as File
-      if (photoFile && photoFile.size > 0) {
-        try {
-          // 파일 크기 제한 (5MB)
-          if (photoFile.size > 5 * 1024 * 1024) {
-            console.error(`Photo ${photoIndex} too large: ${photoFile.size} bytes`);
-            photoIndex++
-            continue;
-          }
-
-          const buffer = await photoFile.arrayBuffer()
-          
-          // 완전히 안전한 Base64 인코딩 방식
-          const uint8Array = new Uint8Array(buffer)
-          
-          // 바이너리 데이터를 문자열로 안전하게 변환
-          let binaryString = ''
-          
-          // 작은 청크 단위로 안전하게 처리 (스택 오버플로우 방지)
-          for (let i = 0; i < uint8Array.length; i += 1024) {
-            const chunk = uint8Array.subarray(i, Math.min(i + 1024, uint8Array.length))
-            let chunkString = ''
-            for (let j = 0; j < chunk.length; j++) {
-              chunkString += String.fromCharCode(chunk[j])
-            }
-            binaryString += chunkString
-          }
-          
-          // 전체 바이너리 문자열을 Base64로 변환
-          const base64 = btoa(binaryString)
-          
-          const mimeType = photoFile.type
-          const dataUrl = `data:${mimeType};base64,${base64}`
-          
-          await env.DB.prepare(`
-            INSERT INTO working_girl_photos (working_girl_id, photo_url, is_main, upload_order)
-            VALUES (?, ?, ?, ?)
-          `).bind(workingGirlId, dataUrl, photoIndex === 0 ? 1 : 0, photoIndex + 1).run()
-          
-          // 첫 번째 사진을 메인 사진으로 설정
-          if (photoIndex === 0) {
-            await env.DB.prepare(`
-              UPDATE working_girls SET main_photo = ? WHERE id = ?
-            `).bind(dataUrl, workingGirlId).run()
-          }
-          
-          photos.push({ order: photoIndex + 1, url: dataUrl })
-        } catch (photoError) {
-          console.error(`Error processing photo ${photoIndex}:`, photoError)
-        }
-      }
-      photoIndex++
-    }
-
     return c.json({ 
       success: true, 
       message: '워킹걸이 성공적으로 등록되었습니다.',
-      workingGirl: { id: workingGirlId },
-      photos
+      workingGirl: { id: workingGirlId }
     })
     
   } catch (error) {
@@ -1685,7 +1853,7 @@ app.put('/api/admin/working-girls/:id', async (c) => {
     await env.DB.prepare(`
       UPDATE working_girls SET
         user_id = ?, nickname = ?, age = ?, height = ?, weight = ?,
-        gender = ?, region = ?, phone = ?, line_id = ?, kakao_id = ?, management_code = ?, agency = ?, conditions = ?,
+        gender = ?, region = ?, phone = ?, line_id = ?, kakao_id = ?, management_code = ?, agency = ?, fee = ?, conditions = ?,
         is_recommended = ?, is_active = ?
       WHERE id = ?
     `).bind(
@@ -1701,6 +1869,7 @@ app.put('/api/admin/working-girls/:id', async (c) => {
       formData.get('wechat_id')?.toString() || existingGirl.kakao_id || '',
       management_code,
       formData.get('agency')?.toString() || existingGirl.agency || '',
+      formData.get('fee')?.toString() || existingGirl.fee || '',
       formData.get('conditions')?.toString() || existingGirl.conditions || '',
       formData.get('is_recommended') === 'true' ? 1 : 0,
       formData.get('is_active') !== 'false' ? 1 : 0,
@@ -1775,6 +1944,27 @@ app.put('/api/admin/working-girls/:id', async (c) => {
       }
     }
 
+    // 메인 사진 설정 처리
+    const mainPhotoId = formData.get('main_photo_id')?.toString()
+    if (mainPhotoId) {
+      // 기존 메인 사진을 일반 사진으로 변경
+      await env.DB.prepare(`UPDATE working_girl_photos SET is_main = 0 WHERE working_girl_id = ?`)
+        .bind(workingGirlId).run()
+      
+      // 새로운 메인 사진 설정
+      await env.DB.prepare(`UPDATE working_girl_photos SET is_main = 1 WHERE id = ? AND working_girl_id = ?`)
+        .bind(mainPhotoId, workingGirlId).run()
+      
+      // working_girls 테이블의 main_photo도 업데이트
+      const newMainPhoto = await env.DB.prepare(`SELECT photo_url FROM working_girl_photos WHERE id = ?`)
+        .bind(mainPhotoId).first()
+      
+      if (newMainPhoto) {
+        await env.DB.prepare(`UPDATE working_girls SET main_photo = ? WHERE id = ?`)
+          .bind(newMainPhoto.photo_url, workingGirlId).run()
+      }
+    }
+
     return c.json({ 
       success: true, 
       message: '워킹걸 정보가 성공적으로 수정되었습니다.',
@@ -1818,36 +2008,89 @@ app.delete('/api/admin/working-girls/:id', async (c) => {
   }
 })
 
-// 관리자용 워킹걸 목록 조회 API
+// 관리자용 워킹걸 목록 조회 API (간소화된 버전)
 app.get('/api/admin/working-girls', async (c) => {
   const { env } = c
   
   try {
+    console.log('Admin working girls list request received')
+    
+    // 데이터베이스 연결 확인
+    if (!env.DB) {
+      console.error('Database connection not available')
+      return c.json({ success: false, message: '데이터베이스 연결 오류' }, 500)
+    }
+    
     const search = c.req.query('search') || ''
+    console.log('Search query:', search)
+    
+    // 워킹걸 기본 정보 조회
     let query = `
-      SELECT wg.*, 
-        (SELECT COUNT(*) FROM working_girl_photos WHERE working_girl_id = wg.id) as photo_count
-      FROM working_girls wg
+      SELECT id, user_id, nickname, age, height, weight, gender, region, 
+             line_id, kakao_id, phone, management_code, agency, conditions, 
+             main_photo, is_active, is_recommended, created_at, updated_at
+      FROM working_girls
     `
     let params = []
     
     if (search) {
-      query += ` WHERE (user_id LIKE ? OR nickname LIKE ? OR region LIKE ?)`
-      params = [`%${search}%`, `%${search}%`, `%${search}%`]
+      query += ` WHERE (user_id LIKE ? OR nickname LIKE ? OR region LIKE ? OR management_code LIKE ?)`
+      params = [`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`]
     }
     
-    query += ` ORDER BY created_at DESC`
+    query += ` ORDER BY created_at DESC LIMIT 100` // 최대 100개로 제한
+    console.log('Executing query:', query)
     
     const workingGirls = await env.DB.prepare(query).bind(...params).all()
+    console.log('Query completed, results:', workingGirls?.results?.length || 0)
+    
+    // 사진 개수를 배치로 조회 (성능 최적화)
+    const workingGirlIds = (workingGirls.results || []).map(girl => girl.id)
+    
+    let photoCountsMap = {}
+    if (workingGirlIds.length > 0) {
+      try {
+        // 한 번의 쿼리로 모든 사진 개수를 가져오기
+        const placeholders = workingGirlIds.map(() => '?').join(',')
+        const photoCountsQuery = `
+          SELECT working_girl_id, COUNT(*) as count 
+          FROM working_girl_photos 
+          WHERE working_girl_id IN (${placeholders})
+          GROUP BY working_girl_id
+        `
+        
+        const photoCounts = await env.DB.prepare(photoCountsQuery).bind(...workingGirlIds).all()
+        
+        // Map으로 변환
+        for (const row of (photoCounts.results || [])) {
+          photoCountsMap[row.working_girl_id] = row.count
+        }
+        
+        console.log('Photo counts loaded for', Object.keys(photoCountsMap).length, 'working girls')
+      } catch (photoError) {
+        console.warn('Error loading photo counts:', photoError)
+      }
+    }
+    
+    // 사진 개수를 포함한 최종 목록 생성
+    const workingGirlsList = (workingGirls.results || []).map(girl => ({
+      ...girl,
+      photo_count: photoCountsMap[girl.id] || 0
+    }))
+    
+    console.log(`Returning ${workingGirlsList.length} working girls`)
     
     return c.json({ 
       success: true, 
-      workingGirls: workingGirls.results || []
+      workingGirls: workingGirlsList
     })
     
   } catch (error) {
     console.error('Admin working girls list error:', error)
-    return c.json({ success: false, message: '목록 조회 중 오류가 발생했습니다.' }, 500)
+    return c.json({ 
+      success: false, 
+      message: `목록 조회 중 오류: ${error.message}`
+    }, 500)
   }
 })
 
@@ -1860,7 +2103,7 @@ app.get('/api/admin/working-girls/:id', async (c) => {
     // 워킹걸 기본 정보 (패스워드 제외)
     const workingGirl = await env.DB.prepare(`
       SELECT id, user_id, nickname, age, height, weight, gender, region, 
-             line_id, kakao_id, phone, management_code, agency, conditions, 
+             line_id, kakao_id, phone, management_code, agency, fee, conditions, 
              main_photo, is_active, is_recommended, created_at, updated_at
       FROM working_girls WHERE id = ?
     `).bind(workingGirlId).first()

@@ -7,6 +7,14 @@ let currentAd = 0;
 let workingGirlsData = [];
 let advertisementsData = [];
 
+// 무한 스크롤 페이지네이션 변수
+let currentPage = 1;
+let currentLimit = 20;
+let isLoading = false;
+let hasMoreData = true;
+let currentSearchQuery = '';
+let isScrollListenerActive = false;
+
 // 페이지 로드 시 초기화
 document.addEventListener('DOMContentLoaded', function() {
     initializeApp();
@@ -138,37 +146,228 @@ function showActivityStatus(isActive) {
     updateStatusButton(isActive);
 }
 
-// 워킹걸 데이터 로드
-function loadWorkingGirls(searchQuery = '') {
+// 워킹걸 데이터 로드 (무한 스크롤 지원)
+function loadWorkingGirls(searchQuery = '', resetData = true) {
+    console.log('loadWorkingGirls 호출:', { searchQuery, resetData, currentPage, isLoading });
+    
+    // 이미 로딩 중이거나 더 이상 데이터가 없으면 중단
+    if (isLoading || (!resetData && !hasMoreData)) {
+        console.log('로딩 중단:', { isLoading, hasMoreData, resetData });
+        return;
+    }
+    
+    // 새 검색이거나 초기 로드인 경우 상태 초기화
+    if (resetData) {
+        currentPage = 1;
+        hasMoreData = true;
+        currentSearchQuery = searchQuery;
+        workingGirlsData = [];
+        
+        // 스크롤 리스너 제거 후 재등록
+        removeScrollListener();
+    }
+    
+    isLoading = true;
+    
     const loading = document.getElementById('loading');
     const noData = document.getElementById('no-data');
     const workingGirlsList = document.getElementById('working-girls-list');
 
-    loading.classList.remove('hidden');
-    noData.classList.add('hidden');
+    // 첫 페이지 로딩시에만 로딩 인디케이터 표시
+    if (resetData) {
+        loading.classList.remove('hidden');
+        noData.classList.add('hidden');
+    }
 
-    const url = searchQuery ? `/api/working-girls/search?q=${encodeURIComponent(searchQuery)}` : '/api/working-girls';
+    // URL 구성 - 페이지네이션 파라미터 포함
+    const baseUrl = searchQuery ? '/api/working-girls/search' : '/api/working-girls';
+    const params = new URLSearchParams({
+        page: currentPage.toString(),
+        limit: currentLimit.toString()
+    });
+    
+    if (searchQuery) {
+        params.append('q', searchQuery);
+    }
+    
+    const url = `${baseUrl}?${params.toString()}`;
+    console.log('API 요청 URL:', url);
 
     axios.get(url)
         .then(response => {
-            workingGirlsData = response.data.working_girls || [];
-            displayWorkingGirls(workingGirlsData);
+            console.log('API 응답:', response.data);
+            
+            const newWorkingGirls = response.data.working_girls || [];
+            const pagination = response.data.pagination || {};
+            
+            // 데이터 병합 또는 교체
+            if (resetData) {
+                workingGirlsData = newWorkingGirls;
+            } else {
+                workingGirlsData = [...workingGirlsData, ...newWorkingGirls];
+            }
+            
+            // 페이지네이션 상태 업데이트
+            hasMoreData = pagination.hasMore !== undefined ? pagination.hasMore : newWorkingGirls.length === currentLimit;
+            
+            console.log('데이터 로드 완료:', {
+                totalItems: workingGirlsData.length,
+                newItems: newWorkingGirls.length,
+                hasMoreData,
+                currentPage
+            });
+            
+            // UI 업데이트
+            displayWorkingGirls(workingGirlsData, resetData);
+            
+            // 다음 페이지 준비
+            currentPage++;
+            
+            // 스크롤 리스너 등록 (첫 로드 후)
+            if (resetData) {
+                addScrollListener();
+                hideScrollLoading();
+                hideLoadMoreButton();
+            } else {
+                hideScrollLoading();
+                hideLoadMoreButton();
+                
+                // 더 많은 데이터가 있으면 로드 모어 버튼 표시
+                if (hasMoreData) {
+                    showLoadMoreButton();
+                }
+            }
         })
         .catch(error => {
             console.error('Failed to load working girls:', error);
             showNotification('데이터를 불러오는데 실패했습니다.', 'error');
         })
         .finally(() => {
-            loading.classList.add('hidden');
+            isLoading = false;
+            hideScrollLoading();
+            
+            if (resetData) {
+                loading.classList.add('hidden');
+            }
         });
 }
 
-// 워킹걸 리스트 표시
-function displayWorkingGirls(workingGirls) {
+// 무한 스크롤 리스너 추가
+function addScrollListener() {
+    if (isScrollListenerActive) {
+        console.log('스크롤 리스너 이미 활성화됨');
+        return;
+    }
+    
+    console.log('스크롤 리스너 추가');
+    window.addEventListener('scroll', handleScroll);
+    isScrollListenerActive = true;
+}
+
+// 스크롤 리스너 제거
+function removeScrollListener() {
+    if (!isScrollListenerActive) {
+        return;
+    }
+    
+    console.log('스크롤 리스너 제거');
+    window.removeEventListener('scroll', handleScroll);
+    isScrollListenerActive = false;
+}
+
+// 스크롤 이벤트 처리
+function handleScroll() {
+    // 로딩 중이거나 더 이상 데이터가 없으면 중단
+    if (isLoading || !hasMoreData) {
+        return;
+    }
+    
+    // 페이지 하단에서 300px 이내에 도달하면 다음 페이지 로드
+    const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+    const windowHeight = window.innerHeight;
+    const documentHeight = document.documentElement.scrollHeight;
+    
+    const scrollThreshold = 300; // 300px 전에 미리 로드
+    
+    if (scrollTop + windowHeight >= documentHeight - scrollThreshold) {
+        console.log('스크롤 하단 도달 - 다음 페이지 로드');
+        showScrollLoading(); // 스크롤 로딩 인디케이터 표시
+        loadWorkingGirls(currentSearchQuery, false); // resetData = false로 추가 로드
+    }
+}
+
+// 로딩 인디케이터 표시 (스크롤 로딩용)
+function showScrollLoading() {
+    const workingGirlsList = document.getElementById('working-girls-list');
+    
+    // 이미 로딩 인디케이터가 있으면 중복 방지
+    if (document.getElementById('scroll-loading')) {
+        return;
+    }
+    
+    const loadingHTML = `
+        <div id="scroll-loading" class="col-span-full flex justify-center items-center py-8">
+            <div class="flex items-center space-x-2 text-gray-600">
+                <i class="fas fa-spinner fa-spin"></i>
+                <span>추가 데이터를 불러오는 중...</span>
+            </div>
+        </div>
+    `;
+    
+    workingGirlsList.insertAdjacentHTML('beforeend', loadingHTML);
+}
+
+// 로딩 인디케이터 제거
+function hideScrollLoading() {
+    const scrollLoading = document.getElementById('scroll-loading');
+    if (scrollLoading) {
+        scrollLoading.remove();
+    }
+}
+
+// "Load More" 버튼 표시 (스크롤이 작동하지 않을 때를 위한 대비책)
+function showLoadMoreButton() {
+    const workingGirlsList = document.getElementById('working-girls-list');
+    
+    // 이미 버튼이 있으면 중복 방지
+    if (document.getElementById('load-more-btn')) {
+        return;
+    }
+    
+    if (hasMoreData && !isLoading) {
+        const buttonHTML = `
+            <div id="load-more-btn" class="col-span-full flex justify-center mt-8">
+                <button onclick="loadMoreWorkingGirls()" class="bg-thai-red hover:bg-red-600 text-white px-8 py-3 rounded-lg font-medium transition-colors duration-200">
+                    <i class="fas fa-plus mr-2"></i>더 보기
+                </button>
+            </div>
+        `;
+        workingGirlsList.insertAdjacentHTML('beforeend', buttonHTML);
+    }
+}
+
+// "Load More" 버튼 제거
+function hideLoadMoreButton() {
+    const loadMoreBtn = document.getElementById('load-more-btn');
+    if (loadMoreBtn) {
+        loadMoreBtn.remove();
+    }
+}
+
+// 수동으로 더 보기 (버튼 클릭용)
+function loadMoreWorkingGirls() {
+    if (hasMoreData && !isLoading) {
+        hideLoadMoreButton();
+        loadWorkingGirls(currentSearchQuery, false);
+    }
+}
+
+// 워킹걸 리스트 표시 (무한 스크롤 지원)
+function displayWorkingGirls(workingGirls, resetContent = true) {
     const workingGirlsList = document.getElementById('working-girls-list');
     const noData = document.getElementById('no-data');
 
-    if (workingGirls.length === 0) {
+    if (workingGirls.length === 0 && resetContent) {
         workingGirlsList.innerHTML = '';
         noData.classList.remove('hidden');
         return;
@@ -230,7 +429,12 @@ function displayWorkingGirls(workingGirls) {
         `;
     }).join('');
 
-    workingGirlsList.innerHTML = cardsHTML;
+    // 내용 교체 또는 추가
+    if (resetContent) {
+        workingGirlsList.innerHTML = cardsHTML;
+    } else {
+        workingGirlsList.insertAdjacentHTML('beforeend', cardsHTML);
+    }
 }
 
 // 워킹걸 검색
@@ -238,7 +442,8 @@ function searchWorkingGirls() {
     const searchInput = document.getElementById('search-input');
     const searchQuery = searchInput.value.trim();
     
-    loadWorkingGirls(searchQuery);
+    console.log('검색 실행:', searchQuery);
+    loadWorkingGirls(searchQuery, true); // resetData = true로 새로운 검색 시작
 }
 
 // 워킹걸 상세 정보 표시
@@ -436,7 +641,7 @@ function requestMeeting(workingGirlId) {
                         </div>
                         
                         <div class="mb-4">
-                            <label class="block text-sm font-medium text-gray-700 mb-2">현재 위치</label>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">현재 위치 *</label>
                             <div class="flex space-x-2">
                                 <button type="button" onclick="getCurrentLocation()" 
                                         class="flex-1 bg-blue-500 hover:bg-blue-600 text-white py-2 px-3 rounded-lg font-medium transition-colors duration-200">
@@ -446,14 +651,25 @@ function requestMeeting(workingGirlId) {
                                     위치를 확인해주세요
                                 </div>
                             </div>
-                            <input type="hidden" id="user-location" value="">
+                            <input type="hidden" id="user-location" value="" required>
                         </div>
                         
-                        <div class="mb-6">
+                        <div class="mb-4">
                             <label class="block text-sm font-medium text-gray-700 mb-2">추가 메시지 (선택)</label>
                             <textarea id="meeting-message" rows="3" 
                                       placeholder="간단한 인사나 요청 사항을 입력해주세요..."
                                       class="w-full p-3 border border-gray-300 rounded-lg focus:border-thai-red focus:outline-none resize-vertical"></textarea>
+                        </div>
+                        
+                        <!-- 중요 안내 문구 -->
+                        <div class="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                            <div class="flex items-start space-x-2">
+                                <i class="fas fa-info-circle text-blue-500 mt-0.5"></i>
+                                <div class="text-sm text-blue-700">
+                                    <strong>중요 안내:</strong><br>
+                                    만남 요청은 텔레그램으로 전송되오니, 반드시 텔레그램을 사용해 주셔야 합니다. 요청을 보내신 후 담당자가 내용을 확인하여 고객님께 텔레그램으로 메시지를 보내드리겠습니다.
+                                </div>
+                            </div>
                         </div>
                         
                         <div class="flex space-x-3">
@@ -1427,6 +1643,11 @@ async function submitMeetingRequest(event, workingGirlId) {
         
         if (!userName || !userTelegram) {
             showNotification('이름과 텔레그램 아이디는 필수입니다.', 'warning');
+            return;
+        }
+        
+        if (!userLocation) {
+            showNotification('현재 위치 확인이 필요합니다. 위치 확인 버튼을 클릭해주세요.', 'warning');
             return;
         }
         

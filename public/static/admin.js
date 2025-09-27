@@ -25,19 +25,42 @@ function setupEventListeners() {
 // 워킹걸 목록 로드
 async function loadWorkingGirlsList(search = '') {
     try {
+        console.log('Loading working girls list with search:', search)
+        
         const response = await axios.get('/api/admin/working-girls', {
-            params: { search }
+            params: { search },
+            timeout: 30000 // 30초 타임아웃
         });
         
+        console.log('Working girls API response:', response)
+        
         if (response.data.success) {
-            currentWorkingGirls = response.data.workingGirls;
+            currentWorkingGirls = response.data.workingGirls || [];
+            console.log('Loaded working girls:', currentWorkingGirls)
             displayWorkingGirlsList();
         } else {
+            console.error('API returned error:', response.data.message)
             alert('목록을 불러오는데 실패했습니다: ' + response.data.message);
         }
     } catch (error) {
         console.error('워킹걸 목록 로드 오류:', error);
-        alert('목록을 불러오는 중 오류가 발생했습니다.');
+        console.error('Error details:', {
+            message: error.message,
+            response: error.response,
+            responseData: error.response?.data,
+            status: error.response?.status
+        })
+        
+        let errorMessage = '목록을 불러오는 중 오류가 발생했습니다.';
+        if (error.response?.status === 500) {
+            errorMessage = '서버 오류: ' + (error.response?.data?.message || '데이터베이스 오류');
+        } else if (error.response?.data?.message) {
+            errorMessage = error.response.data.message;
+        } else if (error.message) {
+            errorMessage += ' (' + error.message + ')';
+        }
+        
+        alert(errorMessage);
     }
 }
 
@@ -154,6 +177,7 @@ async function editWorkingGirl(workingGirlId) {
             document.getElementById('wg_phone').value = workingGirl.phone || '';
             document.getElementById('wg_line_id').value = workingGirl.line_id || '';
             document.getElementById('wg_wechat_id').value = workingGirl.kakao_id || '';
+            document.getElementById('wg_fee').value = workingGirl.fee || '';
             document.getElementById('wg_conditions').value = workingGirl.conditions || '';
             document.getElementById('wg_is_recommended').checked = workingGirl.is_recommended;
             document.getElementById('wg_is_active').checked = workingGirl.is_active;
@@ -195,18 +219,72 @@ function displayExistingPhotos(photos) {
         <div class="relative group" data-photo-id="${photo.id}">
             <img src="${photo.photo_url}" 
                  alt="워킹걸 사진" 
-                 class="w-full h-24 object-cover rounded border cursor-pointer"
+                 class="w-full h-24 object-cover rounded border cursor-pointer ${photo.is_main ? 'border-4 border-yellow-400' : 'border-gray-300'}"
                  onclick="showPhotoLightbox('${photo.photo_url.replace(/'/g, '\\\'').replace(/"/g, '&quot;')}')">
             <button type="button" 
                     onclick="togglePhotoForDeletion(${photo.id})"
                     class="absolute top-1 right-1 bg-red-500 text-white rounded-full w-6 h-6 text-xs opacity-70 hover:opacity-100 transition-opacity">
                 <i class="fas fa-times"></i>
             </button>
+            <button type="button" 
+                    onclick="setMainPhoto(${photo.id})"
+                    class="absolute top-1 left-1 ${photo.is_main ? 'bg-yellow-500' : 'bg-gray-500'} text-white rounded-full w-6 h-6 text-xs opacity-70 hover:opacity-100 transition-opacity"
+                    title="${photo.is_main ? '메인 사진' : '메인으로 설정'}">
+                <i class="fas fa-star"></i>
+            </button>
             <div class="absolute bottom-1 left-1 bg-black bg-opacity-50 text-white text-xs px-1 rounded">
-                #${photo.upload_order}
+                #${photo.upload_order} ${photo.is_main ? '★' : ''}
             </div>
         </div>
     `).join('');
+}
+
+// 메인 사진 설정
+let selectedMainPhotoId = null;
+
+function setMainPhoto(photoId) {
+    // 이전 메인 사진 표시 제거
+    const previousMain = document.querySelector('.border-yellow-400');
+    if (previousMain) {
+        previousMain.classList.remove('border-4', 'border-yellow-400');
+        previousMain.classList.add('border-gray-300');
+    }
+    
+    // 이전 메인 사진 버튼 색상 변경
+    const previousMainBtn = document.querySelector('.bg-yellow-500');
+    if (previousMainBtn) {
+        previousMainBtn.classList.remove('bg-yellow-500');
+        previousMainBtn.classList.add('bg-gray-500');
+        previousMainBtn.title = '메인으로 설정';
+    }
+    
+    // 새 메인 사진 설정
+    const newMainPhoto = document.querySelector(`[data-photo-id="${photoId}"] img`);
+    const newMainBtn = document.querySelector(`[data-photo-id="${photoId}"] button[onclick*="setMainPhoto"]`);
+    
+    if (newMainPhoto) {
+        newMainPhoto.classList.remove('border-gray-300');
+        newMainPhoto.classList.add('border-4', 'border-yellow-400');
+    }
+    
+    if (newMainBtn) {
+        newMainBtn.classList.remove('bg-gray-500');
+        newMainBtn.classList.add('bg-yellow-500');
+        newMainBtn.title = '메인 사진';
+    }
+    
+    // 하단 순서 표시에도 별표 추가
+    document.querySelectorAll('[data-photo-id] .absolute.bottom-1').forEach(div => {
+        if (div.closest('[data-photo-id]').getAttribute('data-photo-id') == photoId) {
+            const orderText = div.textContent.replace(' ★', '');
+            div.textContent = orderText + ' ★';
+        } else {
+            div.textContent = div.textContent.replace(' ★', '');
+        }
+    });
+    
+    selectedMainPhotoId = photoId;
+    console.log('Main photo set to:', photoId);
 }
 
 // 사진 삭제 토글
@@ -331,11 +409,15 @@ async function handleWorkingGirlSubmit(e) {
     const editingId = document.getElementById('editingWorkingGirlId').value;
     
     // 기본 정보 추가
-    const fields = ['username', 'nickname', 'management_code', 'agency', 'age', 'height', 'weight', 'gender', 'region', 'phone', 'line_id', 'wechat_id', 'conditions'];
+    const fields = ['username', 'nickname', 'management_code', 'agency', 'age', 'height', 'weight', 'gender', 'region', 'phone', 'line_id', 'wechat_id', 'fee', 'conditions'];
     fields.forEach(field => {
         const element = document.getElementById(`wg_${field}`);
         if (element) {
-            formData.append(field, element.value);
+            const value = element.value?.trim() || '';
+            formData.append(field, value);
+            console.log(`Field ${field}: ${value}`);
+        } else {
+            console.warn(`Field element not found: wg_${field}`);
         }
     });
     
@@ -358,19 +440,35 @@ async function handleWorkingGirlSubmit(e) {
         formData.append('delete_photo_ids', Array.from(selectedPhotosToDelete).join(','));
     }
     
+    // 메인 사진 ID 추가 (수정 모드일 때만)
+    if (editingId && selectedMainPhotoId) {
+        formData.append('main_photo_id', selectedMainPhotoId);
+    }
+    
     try {
+        console.log('Submitting form data:', formData);
+        console.log('FormData entries:');
+        for (let pair of formData.entries()) {
+            console.log(pair[0] + ': ' + pair[1]);
+        }
+        
         let response;
         if (editingId) {
             // 수정 요청
+            console.log('Sending PUT request to:', `/api/admin/working-girls/${editingId}`);
             response = await axios.put(`/api/admin/working-girls/${editingId}`, formData, {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
         } else {
             // 등록 요청
+            console.log('Sending POST request to: /api/admin/working-girls');
             response = await axios.post('/api/admin/working-girls', formData, {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
         }
+        
+        console.log('Response:', response);
+        console.log('Response data:', response.data);
         
         if (response.data.success) {
             alert(response.data.message);
@@ -381,7 +479,15 @@ async function handleWorkingGirlSubmit(e) {
         }
     } catch (error) {
         console.error('워킹걸 저장 오류:', error);
-        alert('저장 중 오류가 발생했습니다.');
+        console.error('Error details:', {
+            message: error.message,
+            response: error.response,
+            responseData: error.response?.data,
+            status: error.response?.status
+        });
+        
+        const errorMessage = error.response?.data?.message || error.message || '알 수 없는 오류가 발생했습니다.';
+        alert('저장 중 오류가 발생했습니다: ' + errorMessage);
     }
 }
 
@@ -482,6 +588,7 @@ function resetWorkingGirlForm() {
     document.getElementById('newPhotosPreview').innerHTML = '';
     document.getElementById('existingPhotosList').innerHTML = '';
     selectedPhotosToDelete.clear();
+    selectedMainPhotoId = null;
     
     // 기본값 설정
     document.getElementById('wg_is_active').checked = true;
