@@ -165,6 +165,9 @@ function loadWorkingGirls(searchQuery = '', resetData = true) {
         
         // 스크롤 리스너 제거 후 재등록
         removeScrollListener();
+    } else {
+        // 추가 로딩인 경우 페이지 번호 증가
+        currentPage++;
     }
     
     isLoading = true;
@@ -220,8 +223,7 @@ function loadWorkingGirls(searchQuery = '', resetData = true) {
             // UI 업데이트
             displayWorkingGirls(workingGirlsData, resetData);
             
-            // 다음 페이지 준비
-            currentPage++;
+            // 페이지 준비 완료
             
             // 스크롤 리스너 등록 (첫 로드 후)
             if (resetData) {

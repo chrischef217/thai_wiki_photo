@@ -366,7 +366,7 @@ app.get('/', async (c) => {
     </head>
     <body class="bg-gray-50">
         <!-- 상단바 -->
-        <header class="text-white shadow-lg" style="background-color: #241E7E;">
+        <header class="text-white shadow-lg" style="background: linear-gradient(to right, #241E7E, #ED1C24);">
             <div class="container mx-auto px-4 py-3 flex justify-between items-center">
                 <!-- 사이트 로고 -->
                 <div class="flex items-center space-x-3">
@@ -1403,7 +1403,7 @@ app.get('/admin', async (c) => {
       </head>
       <body class="bg-gray-50">
           <!-- 관리자 헤더 -->
-          <header class="text-white shadow-lg" style="background-color: #241E7E;">
+          <header class="text-white shadow-lg" style="background: linear-gradient(to right, #241E7E, #ED1C24);">
               <div class="container mx-auto px-4 py-3 flex justify-between items-center">
                   <h1 class="text-2xl font-bold">
                       <i class="fas fa-cog mr-2"></i>타이위키 관리자
