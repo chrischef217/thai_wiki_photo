@@ -1439,19 +1439,19 @@ app.get('/admin', async (c) => {
                   <h2 class="text-xl font-bold mb-4">지역별 워킹걸 수</h2>
                   <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
                       <div class="text-center p-4 bg-blue-50 rounded">
-                          <h3 class="font-bold text-lg">${stats[3].count}</h3>
+                          <h3 class="font-bold text-lg">${stats[4].count}</h3>
                           <p>방콕</p>
                       </div>
                       <div class="text-center p-4 bg-green-50 rounded">
-                          <h3 class="font-bold text-lg">${stats[4].count}</h3>
+                          <h3 class="font-bold text-lg">${stats[5].count}</h3>
                           <p>파타야</p>
                       </div>
                       <div class="text-center p-4 bg-yellow-50 rounded">
-                          <h3 class="font-bold text-lg">${stats[5].count}</h3>
+                          <h3 class="font-bold text-lg">${stats[6].count}</h3>
                           <p>치앙마이</p>
                       </div>
                       <div class="text-center p-4 bg-red-50 rounded">
-                          <h3 class="font-bold text-lg">${stats[6].count}</h3>
+                          <h3 class="font-bold text-lg">${stats[7].count}</h3>
                           <p>푸켓</p>
                       </div>
                   </div>
