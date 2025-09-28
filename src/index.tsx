@@ -354,7 +354,13 @@ app.get('/', async (c) => {
           .text-thai-red { color: var(--thai-red); }
           .bg-thai-red { background-color: var(--thai-red); }
           .border-thai-red { border-color: var(--thai-red); }
+          .text-thai-blue { color: var(--thai-blue); }
+          .bg-thai-blue { background-color: var(--thai-blue); }
+          .border-thai-blue { border-color: var(--thai-blue); }
+          .from-thai-blue { --tw-gradient-from: var(--thai-blue); }
+          .to-thai-red { --tw-gradient-to: var(--thai-red); }
           .hover\:bg-red-600:hover { background-color: #DC2626; }
+          .hover\:bg-blue-700:hover { background-color: #1D4ED8; }
         </style>
         <link href="/static/style.css" rel="stylesheet">
     </head>
@@ -1247,7 +1253,13 @@ app.get('/admin/login', async (c) => {
           .text-thai-red { color: var(--thai-red); }
           .bg-thai-red { background-color: var(--thai-red); }
           .border-thai-red { border-color: var(--thai-red); }
+          .text-thai-blue { color: var(--thai-blue); }
+          .bg-thai-blue { background-color: var(--thai-blue); }
+          .border-thai-blue { border-color: var(--thai-blue); }
+          .from-thai-blue { --tw-gradient-from: var(--thai-blue); }
+          .to-thai-red { --tw-gradient-to: var(--thai-red); }
           .hover\:bg-red-600:hover { background-color: #DC2626; }
+          .hover\:bg-blue-700:hover { background-color: #1D4ED8; }
         </style>
     </head>
     <body class="bg-gray-50 min-h-screen flex items-center justify-center">
