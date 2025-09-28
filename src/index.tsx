@@ -343,23 +343,19 @@ app.get('/', async (c) => {
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>타이위키 (Thai Wiki) - 태국 워킹걸 정보</title>
-        <script src="https://cdn.tailwindcss.com"></script>
+        <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
-        <script>
-          tailwind.config = {
-            theme: {
-              extend: {
-                colors: {
-                  thai: {
-                    red: '#ED1C24',
-                    blue: '#241E7E',
-                    white: '#FFFFFF'
-                  }
-                }
-              }
-            }
+        <style>
+          :root {
+            --thai-red: #ED1C24;
+            --thai-blue: #241E7E;
+            --thai-white: #FFFFFF;
           }
-        </script>
+          .text-thai-red { color: var(--thai-red); }
+          .bg-thai-red { background-color: var(--thai-red); }
+          .border-thai-red { border-color: var(--thai-red); }
+          .hover\:bg-red-600:hover { background-color: #DC2626; }
+        </style>
         <link href="/static/style.css" rel="stylesheet">
     </head>
     <body class="bg-gray-50">
@@ -490,7 +486,7 @@ app.get('/api/working-girls', async (c) => {
     // 워킹걸 기본 정보 조회 (VIP -> 추천 -> 일반 순서로 정렬)
     const girlsResult = await env.DB.prepare(`
       SELECT id, user_id, nickname, age, height, weight, gender, region, 
-             line_id, kakao_id, phone, management_code, agency, fee, 
+             line_id, kakao_id, phone, management_code, agency, conditions, 
              main_photo, is_active, is_recommended, is_vip, created_at, updated_at
       FROM working_girls 
       WHERE is_active = 1
@@ -581,7 +577,7 @@ app.get('/api/working-girls/search', async (c) => {
     const searchPattern = `%${query}%`
     const girlsResult = await env.DB.prepare(`
       SELECT id, user_id, nickname, age, height, weight, gender, region, 
-             line_id, kakao_id, phone, management_code, agency, fee, 
+             line_id, kakao_id, phone, management_code, agency, conditions, 
              main_photo, is_active, is_recommended, is_vip, created_at, updated_at
       FROM working_girls 
       WHERE is_active = 1 AND (
@@ -891,9 +887,20 @@ app.post('/api/auth/admin/login', async (c) => {
 // 세션 검증
 app.post('/api/auth/verify-session', async (c) => {
   const { env } = c
-  const { session_token } = await c.req.json()
-
+  
   try {
+    let session_token
+    
+    try {
+      const body = await c.req.json()
+      session_token = body.session_token
+    } catch (error) {
+      return c.json({ success: false, message: '잘못된 요청 형식입니다.' }, 400)
+    }
+    
+    if (!session_token) {
+      return c.json({ success: false, message: '세션 토큰이 필요합니다.' }, 400)
+    }
     const session = await env.DB.prepare(`
       SELECT * FROM sessions WHERE session_token = ? AND expires_at > datetime('now')
     `).bind(session_token).first()
@@ -1229,23 +1236,19 @@ app.get('/admin/login', async (c) => {
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>관리자 로그인 - 타이위키</title>
-        <script src="https://cdn.tailwindcss.com"></script>
+        <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
-        <script>
-          tailwind.config = {
-            theme: {
-              extend: {
-                colors: {
-                  thai: {
-                    red: '#ED1C24',
-                    blue: '#241E7E',
-                    white: '#FFFFFF'
-                  }
-                }
-              }
-            }
+        <style>
+          :root {
+            --thai-red: #ED1C24;
+            --thai-blue: #241E7E;
+            --thai-white: #FFFFFF;
           }
-        </script>
+          .text-thai-red { color: var(--thai-red); }
+          .bg-thai-red { background-color: var(--thai-red); }
+          .border-thai-red { border-color: var(--thai-red); }
+          .hover\:bg-red-600:hover { background-color: #DC2626; }
+        </style>
     </head>
     <body class="bg-gray-50 min-h-screen flex items-center justify-center">
         <div class="max-w-md w-full space-y-8">
@@ -1367,7 +1370,7 @@ app.get('/admin', async (c) => {
           <meta charset="UTF-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <title>타이위키 관리자</title>
-          <script src="https://cdn.tailwindcss.com"></script>
+          <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
           <script>
             tailwind.config = {
               theme: {
