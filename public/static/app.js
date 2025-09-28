@@ -54,7 +54,7 @@ window.requestMeeting = function(workingGirlId) {
     showMeetingModal(workingGirlId);
 };
 
-// 만남 요청 모달 표시 함수
+// 만남 요청 모달 표시 함수 (기존 버전 복원)
 function showMeetingModal(workingGirlId) {
     const modalHTML = `
         <div class="fixed inset-0 bg-black/50 flex items-center justify-center modal-overlay" style="z-index: 55;" onclick="closeMeetingModal(event)">
@@ -76,43 +76,64 @@ function showMeetingModal(workingGirlId) {
                         </div>
                         
                         <div class="mb-4">
-                            <label class="block text-sm font-medium text-gray-700 mb-2">텔레그램 ID *</label>
-                            <input type="text" id="meeting-user-telegram" required 
-                                   placeholder="예: @username 또는 전화번호"
+                            <label class="block text-sm font-medium text-gray-700 mb-2">텔레그램 아이디 *</label>
+                            <input type="text" id="meeting-telegram" required 
+                                   placeholder="예: @username 또는 username"
                                    class="w-full p-3 border border-gray-300 rounded-lg focus:border-thai-red focus:outline-none">
+                            <p class="text-sm text-gray-500 mt-1">@ 기호는 입력하지 않으셔도 됩니다.</p>
                         </div>
                         
                         <div class="mb-4">
-                            <label class="block text-sm font-medium text-gray-700 mb-2">현재 위치</label>
-                            <div class="flex gap-2">
-                                <input type="text" id="user-location" readonly 
-                                       placeholder="위치 확인 버튼을 클릭해주세요"
-                                       class="flex-1 p-3 border border-gray-300 rounded-lg bg-gray-50">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">현재 위치 *</label>
+                            <div class="flex space-x-2">
                                 <button type="button" onclick="getCurrentLocation()" 
-                                        class="bg-thai-blue text-white px-4 py-3 rounded-lg hover:bg-blue-700 transition-colors">
-                                    <i class="fas fa-map-marker-alt"></i>
+                                        class="flex-1 bg-blue-500 hover:bg-blue-600 text-white py-2 px-3 rounded-lg font-medium transition-colors duration-200">
+                                    <i class="fas fa-map-marker-alt mr-2"></i>위치 확인
                                 </button>
+                                <div id="location-status" class="flex-2 p-2 text-sm text-gray-600">
+                                    위치를 확인해주세요
+                                </div>
                             </div>
-                            <div id="location-status" class="mt-2 text-sm text-gray-600"></div>
+                            <input type="hidden" id="user-location" value="" required>
                         </div>
                         
-                        <div class="mb-6">
-                            <label class="block text-sm font-medium text-gray-700 mb-2">메시지 (선택사항)</label>
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">추가 메시지 (선택)</label>
                             <textarea id="meeting-message" rows="3" 
-                                      placeholder="만남 관련 요청사항이나 메시지를 입력해주세요..."
-                                      class="w-full p-3 border border-gray-300 rounded-lg focus:border-thai-red focus:outline-none resize-none"></textarea>
+                                      placeholder="간단한 인사나 요청 사항을 입력해주세요..."
+                                      class="w-full p-3 border border-gray-300 rounded-lg focus:border-thai-red focus:outline-none resize-vertical"></textarea>
                         </div>
                         
-                        <button type="submit" class="w-full bg-thai-red hover:bg-red-600 text-white py-3 rounded-lg font-medium transition-colors">
-                            <i class="fas fa-paper-plane mr-2"></i>만남 요청 전송
-                        </button>
+                        <!-- 중요 안내 문구 -->
+                        <div class="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                            <div class="flex items-start space-x-2">
+                                <i class="fas fa-info-circle text-blue-500 mt-0.5"></i>
+                                <div class="text-sm text-blue-700">
+                                    <strong>중요 안내:</strong><br>
+                                    만남 요청은 텔레그램으로 전송되오니, 반드시 텔레그램을 사용해 주셔야 합니다. 요청을 보내신 후 담당자가 내용을 확인하여 고객님께 텔레그램으로 메시지를 보내드리겠습니다.
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="flex space-x-3">
+                            <button type="button" onclick="closeMeetingModal()" 
+                                    class="flex-1 bg-gray-500 hover:bg-gray-600 text-white py-3 rounded-lg font-medium transition-colors duration-200">
+                                취소
+                            </button>
+                            <button type="submit" 
+                                    class="flex-1 bg-thai-red hover:bg-red-600 text-white py-3 rounded-lg font-medium transition-colors duration-200">
+                                <i class="fas fa-paper-plane mr-2"></i>요청 전송
+                            </button>
+                        </div>
                     </form>
                 </div>
             </div>
         </div>
     `;
     
-    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    // 기존 모달 컨테이너에 추가
+    const existingModal = document.getElementById('modal-container');
+    existingModal.insertAdjacentHTML('beforeend', modalHTML);
 }
 
 // 만남 요청 모달 닫기
