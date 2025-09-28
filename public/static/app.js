@@ -505,7 +505,7 @@ function showWorkingGirlModal(girl) {
 
     const modalHTML = `
         <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 modal-overlay p-4" onclick="closeModal(event)">
-            <div class="bg-white rounded-lg max-w-4xl w-full max-h-[95vh] overflow-y-auto modal-content" onclick="event.stopPropagation()">
+            <div class="bg-white rounded-lg max-w-4xl w-full modal-content" style="max-height: 90vh; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch;" onclick="event.stopPropagation()">
                 <div class="p-6">
                     <div class="flex justify-between items-center mb-4">
                         <h2 class="text-2xl font-bold text-gray-800">${girl.nickname}</h2>
