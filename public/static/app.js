@@ -148,7 +148,7 @@ function showActivityStatus(isActive) {
 
 // 워킹걸 데이터 로드 (무한 스크롤 지원)
 function loadWorkingGirls(searchQuery = '', resetData = true) {
-    console.log('loadWorkingGirls 호출:', { searchQuery, resetData, currentPage, isLoading });
+    console.log('🔍 loadWorkingGirls 호출:', { searchQuery, resetData, currentPage, isLoading, hasMoreData });
     
     // 이미 로딩 중이거나 더 이상 데이터가 없으면 중단
     if (isLoading || (!resetData && !hasMoreData)) {
@@ -165,9 +165,6 @@ function loadWorkingGirls(searchQuery = '', resetData = true) {
         
         // 스크롤 리스너 제거 후 재등록
         removeScrollListener();
-    } else {
-        // 추가 로딩인 경우 페이지 번호 증가
-        currentPage++;
     }
     
     isLoading = true;
@@ -194,7 +191,7 @@ function loadWorkingGirls(searchQuery = '', resetData = true) {
     }
     
     const url = `${baseUrl}?${params.toString()}`;
-    console.log('API 요청 URL:', url);
+    console.log('🌐 API 요청 URL:', url, '| currentPage:', currentPage, '| resetData:', resetData);
 
     axios.get(url)
         .then(response => {
@@ -213,17 +210,18 @@ function loadWorkingGirls(searchQuery = '', resetData = true) {
             // 페이지네이션 상태 업데이트
             hasMoreData = pagination.hasMore !== undefined ? pagination.hasMore : newWorkingGirls.length === currentLimit;
             
-            console.log('데이터 로드 완료:', {
-                totalItems: workingGirlsData.length,
-                newItems: newWorkingGirls.length,
-                hasMoreData,
-                currentPage
-            });
-            
             // UI 업데이트
             displayWorkingGirls(workingGirlsData, resetData);
             
-            // 페이지 준비 완료
+            // 성공적인 로딩 후 페이지 번호 증가
+            currentPage++;
+            
+            console.log('📊 데이터 로드 완료:', {
+                totalItems: workingGirlsData.length,
+                newItems: newWorkingGirls.length,
+                hasMoreData,
+                nextPage: currentPage
+            });
             
             // 스크롤 리스너 등록 (첫 로드 후)
             if (resetData) {
@@ -292,7 +290,7 @@ function handleScroll() {
     const scrollThreshold = 300; // 300px 전에 미리 로드
     
     if (scrollTop + windowHeight >= documentHeight - scrollThreshold) {
-        console.log('스크롤 하단 도달 - 다음 페이지 로드');
+        console.log('📜 스크롤 하단 도달 - 다음 페이지 로드 | 현재 페이지:', currentPage, '| 더 많은 데이터:', hasMoreData);
         showScrollLoading(); // 스크롤 로딩 인디케이터 표시
         loadWorkingGirls(currentSearchQuery, false); // resetData = false로 추가 로드
     }
