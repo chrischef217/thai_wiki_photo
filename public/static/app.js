@@ -162,15 +162,45 @@ function initializeApp() {
 
 // 이벤트 리스너 설정
 function setupEventListeners() {
+    console.log('🔧 이벤트 리스너 설정 시작...');
+    
     // 햄버거 메뉴
     const menuToggle = document.getElementById('menu-toggle');
     const menuClose = document.getElementById('menu-close');
     const sideMenu = document.getElementById('side-menu');
     const menuOverlay = document.getElementById('menu-overlay');
 
-    menuToggle.addEventListener('click', openSideMenu);
-    menuClose.addEventListener('click', closeSideMenu);
-    menuOverlay.addEventListener('click', closeSideMenu);
+    console.log('📱 메뉴 요소들 확인:', {
+        menuToggle: !!menuToggle,
+        menuClose: !!menuClose,
+        sideMenu: !!sideMenu,
+        menuOverlay: !!menuOverlay
+    });
+
+    if (menuToggle) {
+        menuToggle.addEventListener('click', function(e) {
+            console.log('🍔 햄버거 메뉴 클릭됨');
+            e.preventDefault();
+            openSideMenu();
+        });
+    } else {
+        console.error('❌ menu-toggle 요소를 찾을 수 없습니다');
+    }
+    
+    if (menuClose) {
+        menuClose.addEventListener('click', function(e) {
+            console.log('❌ 메뉴 닫기 클릭됨');
+            e.preventDefault();
+            closeSideMenu();
+        });
+    }
+    
+    if (menuOverlay) {
+        menuOverlay.addEventListener('click', function(e) {
+            console.log('🌫️ 메뉴 오버레이 클릭됨');
+            closeSideMenu();
+        });
+    }
 
     // 활동상태 토글 (삭제됨)
     // const statusToggle = document.getElementById('status-toggle');
@@ -178,31 +208,62 @@ function setupEventListeners() {
 
     // 검색
     const searchInput = document.getElementById('search-input');
-    searchInput.addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') {
-            searchWorkingGirls();
-        }
-    });
+    if (searchInput) {
+        searchInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                searchWorkingGirls();
+            }
+        });
+    }
+    
+    console.log('✅ 이벤트 리스너 설정 완료');
 }
 
 // 사이드 메뉴 열기
 function openSideMenu() {
+    console.log('📂 사이드 메뉴 열기 시도...');
     const sideMenu = document.getElementById('side-menu');
     const menuOverlay = document.getElementById('menu-overlay');
     
-    sideMenu.classList.remove('translate-x-full');
-    menuOverlay.classList.remove('hidden');
+    console.log('📱 메뉴 요소 상태:', {
+        sideMenu: !!sideMenu,
+        menuOverlay: !!menuOverlay,
+        sideMenuClasses: sideMenu?.className,
+        overlayClasses: menuOverlay?.className
+    });
+    
+    if (sideMenu) {
+        sideMenu.classList.remove('translate-x-full');
+        console.log('✅ 사이드메뉴 translate-x-full 제거됨');
+    }
+    
+    if (menuOverlay) {
+        menuOverlay.classList.remove('hidden');
+        console.log('✅ 오버레이 hidden 제거됨');
+    }
+    
     document.body.style.overflow = 'hidden';
+    console.log('✅ body 스크롤 비활성화');
 }
 
 // 사이드 메뉴 닫기
 function closeSideMenu() {
+    console.log('📂 사이드 메뉴 닫기 시도...');
     const sideMenu = document.getElementById('side-menu');
     const menuOverlay = document.getElementById('menu-overlay');
     
-    sideMenu.classList.add('translate-x-full');
-    menuOverlay.classList.add('hidden');
+    if (sideMenu) {
+        sideMenu.classList.add('translate-x-full');
+        console.log('✅ 사이드메뉴 translate-x-full 추가됨');
+    }
+    
+    if (menuOverlay) {
+        menuOverlay.classList.add('hidden');
+        console.log('✅ 오버레이 hidden 추가됨');
+    }
+    
     document.body.style.overflow = 'auto';
+    console.log('✅ body 스크롤 활성화');
 }
 
 // 활동상태 토글
@@ -1838,11 +1899,13 @@ function closeMeetingModal(event) {
 
 // 현재 위치 확인 함수
 async function getCurrentLocation() {
+    console.log('📍 위치 확인 시작...');
     const locationStatus = document.getElementById('location-status');
     const locationInput = document.getElementById('user-location');
     
     if (!navigator.geolocation) {
         locationStatus.innerHTML = '<span class="text-red-500">위치 서비스를 지원하지 않습니다</span>';
+        console.log('❌ 위치 서비스 지원 안함');
         return;
     }
     
@@ -1855,41 +1918,50 @@ async function getCurrentLocation() {
                 reject,
                 { 
                     enableHighAccuracy: true, 
-                    timeout: 10000, 
+                    timeout: 15000,  // 시간 제한 늘림
                     maximumAge: 300000 
                 }
             );
         });
         
         const { latitude, longitude } = position.coords;
+        console.log('📍 위치 좌표:', { latitude, longitude });
         const googleMapsUrl = `https://maps.google.com/?q=${latitude},${longitude}`;
         
         // 역지오코딩으로 주소 확인 (선택사항)
         try {
             const response = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=ko`);
             const locationData = await response.json();
-            const address = locationData.locality || locationData.city || '주소 확인 불가';
+            const address = locationData.locality || locationData.city || locationData.countryName || '위치 확인됨';
             
             locationStatus.innerHTML = `<span class="text-green-600"><i class="fas fa-check mr-1"></i>${address}</span>`;
+            console.log('📍 주소 확인:', address);
         } catch (e) {
             locationStatus.innerHTML = `<span class="text-green-600"><i class="fas fa-check mr-1"></i>위치 확인됨</span>`;
+            console.log('📍 주소 API 실패, 좌표만 사용');
         }
         
         locationInput.value = googleMapsUrl;
+        console.log('✅ 위치 확인 완료:', googleMapsUrl);
         
     } catch (error) {
-        console.error('위치 확인 오류:', error);
+        console.error('❌ 위치 확인 오류:', error);
         let errorMessage = '위치 확인 실패';
         
         if (error.code === 1) {
-            errorMessage = '위치 접근이 거부되었습니다';
+            errorMessage = '위치 접근이 거부되었습니다. 브라우저 설정에서 위치 권한을 허용해주세요.';
         } else if (error.code === 2) {
-            errorMessage = '위치를 확인할 수 없습니다';
+            errorMessage = '위치를 확인할 수 없습니다. 네트워크 연결을 확인해주세요.';
         } else if (error.code === 3) {
-            errorMessage = '위치 확인 시간 초과';
+            errorMessage = '위치 확인 시간 초과. 다시 시도해주세요.';
         }
         
         locationStatus.innerHTML = `<span class="text-red-500"><i class="fas fa-exclamation-triangle mr-1"></i>${errorMessage}</span>`;
+        
+        // 수동 입력 옵션 제공
+        locationInput.removeAttribute('required');
+        locationInput.placeholder = '수동으로 위치를 입력해주세요 (예: 방콕 수쿰빗)';
+        locationInput.type = 'text';
     }
 }
 
