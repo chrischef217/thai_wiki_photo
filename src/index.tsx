@@ -1210,6 +1210,117 @@ app.post('/api/auth/logout', async (c) => {
   }
 })
 
+// 관리자 로그인 페이지
+app.get('/admin/login', async (c) => {
+  return c.html(`
+    <!DOCTYPE html>
+    <html lang="ko">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>관리자 로그인 - 타이위키</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+        <script>
+          tailwind.config = {
+            theme: {
+              extend: {
+                colors: {
+                  thai: {
+                    red: '#ED1C24',
+                    blue: '#241E7E',
+                    white: '#FFFFFF'
+                  }
+                }
+              }
+            }
+          }
+        </script>
+    </head>
+    <body class="bg-gray-50 min-h-screen flex items-center justify-center">
+        <div class="max-w-md w-full space-y-8">
+            <div>
+                <div class="mx-auto h-12 w-12 bg-thai-red rounded-full flex items-center justify-center">
+                    <i class="fas fa-user-shield text-white"></i>
+                </div>
+                <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900">관리자 로그인</h2>
+                <p class="mt-2 text-center text-sm text-gray-600">타이위키 관리 시스템</p>
+            </div>
+            <form class="mt-8 space-y-6" onsubmit="handleAdminLogin(event)">
+                <div class="rounded-md shadow-sm -space-y-px">
+                    <div>
+                        <input type="text" name="username" id="username" required 
+                               class="relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-thai-red focus:border-thai-red focus:z-10 sm:text-sm" 
+                               placeholder="관리자 아이디">
+                    </div>
+                    <div>
+                        <input type="password" name="password" id="password" required 
+                               class="relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-thai-red focus:border-thai-red focus:z-10 sm:text-sm" 
+                               placeholder="비밀번호">
+                    </div>
+                </div>
+
+                <div>
+                    <button type="submit" 
+                            class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-thai-red hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-thai-red">
+                        <span class="absolute left-0 inset-y-0 flex items-center pl-3">
+                            <i class="fas fa-lock group-hover:text-red-200 text-red-300"></i>
+                        </span>
+                        로그인
+                    </button>
+                </div>
+            </form>
+            
+            <div id="login-message" class="text-center text-sm hidden"></div>
+        </div>
+
+        <script>
+            async function handleAdminLogin(event) {
+                event.preventDefault();
+                
+                const username = document.getElementById('username').value;
+                const password = document.getElementById('password').value;
+                const messageDiv = document.getElementById('login-message');
+                
+                try {
+                    const response = await fetch('/api/auth/admin/login', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ username, password })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        localStorage.setItem('admin_session_token', data.session_token);
+                        localStorage.setItem('admin_user', JSON.stringify(data.user));
+                        messageDiv.className = 'text-center text-sm text-green-600';
+                        messageDiv.textContent = '로그인 성공! 관리자 페이지로 이동합니다...';
+                        messageDiv.classList.remove('hidden');
+                        
+                        setTimeout(() => {
+                            window.location.href = '/admin';
+                        }, 1000);
+                    } else {
+                        messageDiv.className = 'text-center text-sm text-red-600';
+                        messageDiv.textContent = data.message || '로그인에 실패했습니다.';
+                        messageDiv.classList.remove('hidden');
+                    }
+                } catch (error) {
+                    console.error('Login error:', error);
+                    messageDiv.className = 'text-center text-sm text-red-600';
+                    messageDiv.textContent = '로그인 중 오류가 발생했습니다.';
+                    messageDiv.classList.remove('hidden');
+                }
+            }
+        </script>
+    </body>
+    </html>
+  `)
+})
+
 // 관리자 페이지
 app.get('/admin', async (c) => {
   const { env } = c
