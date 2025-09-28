@@ -18,7 +18,7 @@ let isScrollListenerActive = false;
 // 사진 라이트박스 함수들 (전역 정의)
 function showPhotoLightbox(photoUrl, nickname) {
     const lightboxHTML = `
-        <div class="fixed inset-0 bg-black/80 flex items-center justify-center z-[60] photo-lightbox" onclick="closePhotoLightbox(event)">
+        <div class="fixed inset-0 bg-black/80 flex items-center justify-center photo-lightbox" style="z-index: 100;" onclick="closePhotoLightbox(event)">
             <div class="relative max-w-[90vw] max-h-[90vh] flex items-center justify-center" onclick="event.stopPropagation()">
                 <img src="${photoUrl}" alt="${nickname}" class="max-w-full max-h-full object-contain rounded-lg shadow-2xl">
                 <button onclick="closePhotoLightbox()" class="absolute top-4 right-4 text-white bg-black/50 rounded-full w-10 h-10 flex items-center justify-center hover:bg-black/70 transition-colors">
@@ -47,6 +47,84 @@ window.openPhotoLightbox = function(photoUrl, nickname) {
     console.log('라이트박스 열기:', photoUrl, nickname);
     showPhotoLightbox(photoUrl, nickname);
 };
+
+// 전역 함수로 만남 요청
+window.requestMeeting = function(workingGirlId) {
+    console.log('만남 요청:', workingGirlId);
+    showMeetingModal(workingGirlId);
+};
+
+// 만남 요청 모달 표시 함수
+function showMeetingModal(workingGirlId) {
+    const modalHTML = `
+        <div class="fixed inset-0 bg-black/50 flex items-center justify-center modal-overlay" style="z-index: 55;" onclick="closeMeetingModal(event)">
+            <div class="bg-white rounded-lg max-w-md w-full mx-4 modal-content" onclick="event.stopPropagation()">
+                <div class="p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-xl font-bold text-gray-800">만남 요청</h3>
+                        <button onclick="closeMeetingModal()" class="text-gray-600 hover:text-gray-800 text-2xl">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    
+                    <form onsubmit="submitMeetingRequest(event, ${workingGirlId})">
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">요청자 이름 *</label>
+                            <input type="text" id="meeting-user-name" required 
+                                   placeholder="예: 김철수"
+                                   class="w-full p-3 border border-gray-300 rounded-lg focus:border-thai-red focus:outline-none">
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">텔레그램 ID *</label>
+                            <input type="text" id="meeting-user-telegram" required 
+                                   placeholder="예: @username 또는 전화번호"
+                                   class="w-full p-3 border border-gray-300 rounded-lg focus:border-thai-red focus:outline-none">
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">현재 위치</label>
+                            <div class="flex gap-2">
+                                <input type="text" id="user-location" readonly 
+                                       placeholder="위치 확인 버튼을 클릭해주세요"
+                                       class="flex-1 p-3 border border-gray-300 rounded-lg bg-gray-50">
+                                <button type="button" onclick="getCurrentLocation()" 
+                                        class="bg-thai-blue text-white px-4 py-3 rounded-lg hover:bg-blue-700 transition-colors">
+                                    <i class="fas fa-map-marker-alt"></i>
+                                </button>
+                            </div>
+                            <div id="location-status" class="mt-2 text-sm text-gray-600"></div>
+                        </div>
+                        
+                        <div class="mb-6">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">메시지 (선택사항)</label>
+                            <textarea id="meeting-message" rows="3" 
+                                      placeholder="만남 관련 요청사항이나 메시지를 입력해주세요..."
+                                      class="w-full p-3 border border-gray-300 rounded-lg focus:border-thai-red focus:outline-none resize-none"></textarea>
+                        </div>
+                        
+                        <button type="submit" class="w-full bg-thai-red hover:bg-red-600 text-white py-3 rounded-lg font-medium transition-colors">
+                            <i class="fas fa-paper-plane mr-2"></i>만남 요청 전송
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+}
+
+// 만남 요청 모달 닫기
+function closeMeetingModal(event) {
+    if (event && event.target !== event.currentTarget) return;
+    
+    // z-index가 55인 만남 요청 모달만 찾아서 제거
+    const meetingModal = document.querySelector('.modal-overlay[style*="z-index: 55"], .z-\\[55\\]');
+    if (meetingModal) {
+        meetingModal.remove();
+    }
+}
 
 // 페이지 로드 시 초기화
 document.addEventListener('DOMContentLoaded', function() {
@@ -639,7 +717,7 @@ function showWorkingGirlModal(girl) {
 
                     <!-- 만남 요청 버튼 -->
                     <div class="mt-6 text-center">
-                        <button onclick="requestMeeting(${girl.id})" class="bg-thai-red hover:bg-red-600 text-white px-8 py-3 rounded-lg text-lg font-medium transition-colors duration-200">
+                        <button onclick="window.requestMeeting(${girl.id})" class="bg-thai-red hover:bg-red-600 text-white px-8 py-3 rounded-lg text-lg font-medium transition-colors duration-200">
                             <i class="fas fa-heart mr-2"></i>만남 요청
                         </button>
                     </div>
@@ -1696,7 +1774,7 @@ async function updateWorkingGirlProfile(event) {
 // 사진 라이트박스 기능
 function showPhotoLightbox(photoUrl, nickname) {
     const lightboxHTML = `
-        <div class="fixed inset-0 bg-black/80 flex items-center justify-center z-[60] photo-lightbox" onclick="closePhotoLightbox(event)">
+        <div class="fixed inset-0 bg-black/80 flex items-center justify-center photo-lightbox" style="z-index: 100;" onclick="closePhotoLightbox(event)">
             <div class="relative max-w-[90vw] max-h-[90vh] flex items-center justify-center" onclick="event.stopPropagation()">
                 <img src="${photoUrl}" alt="${nickname}" class="max-w-full max-h-full object-contain rounded-lg shadow-2xl">
                 <button onclick="closePhotoLightbox()" class="absolute top-4 right-4 text-white bg-black/50 rounded-full w-10 h-10 flex items-center justify-center hover:bg-black/70 transition-colors">
