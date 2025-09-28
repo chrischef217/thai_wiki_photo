@@ -174,6 +174,16 @@ app.get('/debug', (c) => {
   `)
 })
 
+// Favicon route
+app.get('/favicon.ico', (c) => {
+  return new Response('', {
+    status: 204,
+    headers: {
+      'Cache-Control': 'public, max-age=86400'
+    }
+  })
+})
+
 // 메인 페이지
 app.get('/', async (c) => {
   const { env } = c
@@ -3338,8 +3348,8 @@ app.post('/api/admin/backup/create', async (c) => {
             backup_id, original_id, working_girl_id, photo_data, photo_type, photo_size, is_main, uploaded_at
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         `).bind(
-          backupId, photo.id, photo.working_girl_id, photo.photo_data, 
-          photo.photo_type, photo.photo_size, photo.is_main, photo.uploaded_at
+          backupId, photo.id, photo.working_girl_id, photo.photo_url || '', 
+          'image/jpeg', 0, photo.is_main, photo.created_at
         ).run()
         backupSize++
       }
@@ -3485,11 +3495,10 @@ app.post('/api/admin/backup/restore/:backupId', async (c) => {
         if (newWorkingGirlId) {
           await env.DB.prepare(`
             INSERT INTO working_girl_photos (
-              working_girl_id, photo_data, photo_type, photo_size, is_main, uploaded_at
-            ) VALUES (?, ?, ?, ?, ?, ?)
+              working_girl_id, photo_url, is_main, upload_order
+            ) VALUES (?, ?, ?, ?)
           `).bind(
-            newWorkingGirlId, photo.photo_data, photo.photo_type,
-            photo.photo_size, photo.is_main, photo.uploaded_at
+            newWorkingGirlId, photo.photo_data, photo.is_main, 1
           ).run()
           restoredCount++
         }
@@ -3616,7 +3625,7 @@ app.get('/api/admin/backup/export/:backupId', async (c) => {
       for (const photo of photos.results) {
         // 사진 데이터는 용량 문제로 처음 100자만 표시
         const photoDataPreview = photo.photo_data ? photo.photo_data.substring(0, 100) + '...' : ''
-        csvContent += `${photo.original_id},${photo.working_girl_id},"${photoDataPreview}","${photo.photo_type}",${photo.photo_size},${photo.is_main ? 1 : 0},"${photo.uploaded_at}"\n`
+        csvContent += `${photo.original_id},${photo.working_girl_id},"${photoDataPreview}","${photo.photo_type || 'image/jpeg'}",${photo.photo_size || 0},${photo.is_main ? 1 : 0},"${photo.uploaded_at}"\n`
       }
     }
 
@@ -3847,8 +3856,8 @@ app.get('/api/admin/data/export', async (c) => {
     if (photos.results && photos.results.length > 0) {
       for (const photo of photos.results) {
         // 사진 데이터는 용량 문제로 처음 100자만 표시
-        const photoDataPreview = photo.photo_data ? photo.photo_data.substring(0, 100) + '...' : ''
-        csvContent += `${photo.id},${photo.working_girl_id},"${photoDataPreview}","${photo.photo_type}",${photo.photo_size},${photo.is_main ? 1 : 0},"${photo.uploaded_at}"\n`
+        const photoDataPreview = photo.photo_url ? photo.photo_url.substring(0, 100) + '...' : ''
+        csvContent += `${photo.id},${photo.working_girl_id},"${photoDataPreview}","image/jpeg",0,${photo.is_main ? 1 : 0},"${photo.created_at}"\n`
       }
     }
 
