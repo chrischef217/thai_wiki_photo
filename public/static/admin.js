@@ -9,6 +9,7 @@ document.addEventListener('DOMContentLoaded', function() {
         loadWorkingGirlsList();
         loadAdvertisementsList();
         loadAdSettings();
+        loadBackupsList(); // 백업 목록 로드 추가
         setupEventListeners();
         console.log('=== 관리자 페이지 초기화 완료 ===');
     } catch (error) {
@@ -1346,3 +1347,209 @@ async function deleteAdvertisement(adId) {
         alert('삭제 중 오류가 발생했습니다.');
     }
 }
+
+// =============================================================================
+// 데이터 백업 관리 기능
+// =============================================================================
+
+// 백업 목록 로드 (페이지 로드시 자동 호출)
+async function loadBackupsList() {
+    try {
+        const response = await axios.get('/api/admin/backup/list');
+        
+        if (response.data.success) {
+            displayBackupsList(response.data.backups);
+        } else {
+            console.error('백업 목록 로드 실패:', response.data.message);
+            displayBackupsList([]);
+        }
+    } catch (error) {
+        console.error('백업 목록 로드 오류:', error);
+        displayBackupsList([]);
+    }
+}
+
+// 백업 목록 화면 표시
+function displayBackupsList(backups) {
+    const backupListContainer = document.getElementById('backup-list');
+    
+    if (!backups || backups.length === 0) {
+        backupListContainer.innerHTML = `
+            <div class="text-center py-8 text-gray-500">
+                <i class="fas fa-database text-3xl mb-3 opacity-50"></i>
+                <p class="text-lg">생성된 백업이 없습니다</p>
+                <p class="text-sm">위의 "백업 생성" 버튼을 눌러 첫 번째 백업을 만들어보세요.</p>
+            </div>
+        `;
+        return;
+    }
+
+    const backupHTML = backups.map(backup => {
+        const backupDate = new Date(backup.backup_date);
+        const formattedDate = backupDate.toLocaleString('ko-KR', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
+        });
+
+        return `
+            <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                <div class="flex justify-between items-center">
+                    <div class="flex-1">
+                        <div class="flex items-center mb-2">
+                            <i class="fas fa-archive text-blue-600 mr-2"></i>
+                            <h3 class="font-semibold text-lg">${backup.backup_name}</h3>
+                        </div>
+                        <div class="text-sm text-gray-600 space-y-1">
+                            <p><i class="fas fa-clock mr-1"></i> 생성일시: ${formattedDate}</p>
+                            <p><i class="fas fa-database mr-1"></i> 데이터 수: ${backup.backup_size}개 항목</p>
+                            ${backup.backup_description ? `<p><i class="fas fa-info-circle mr-1"></i> ${backup.backup_description}</p>` : ''}
+                        </div>
+                    </div>
+                    <div class="flex space-x-2">
+                        <button onclick="restoreBackup(${backup.id}, '${backup.backup_name}')" 
+                                class="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-sm transition-colors">
+                            <i class="fas fa-undo mr-1"></i>복원
+                        </button>
+                        <button onclick="deleteBackup(${backup.id}, '${backup.backup_name}')" 
+                                class="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm transition-colors">
+                            <i class="fas fa-trash mr-1"></i>삭제
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    backupListContainer.innerHTML = backupHTML;
+}
+
+// 백업 생성
+async function createBackup() {
+    // 확인 메시지
+    const confirmed = confirm(
+        '새로운 백업을 생성하시겠습니까?\n\n' +
+        '• 현재 모든 워킹걸, 사진, 광고 데이터가 백업됩니다.\n' +
+        '• 백업은 최대 5개까지 저장되며, 초과시 가장 오래된 백업이 삭제됩니다.\n' +
+        '• 백업 생성에 시간이 걸릴 수 있습니다.'
+    );
+    
+    if (!confirmed) {
+        return;
+    }
+
+    const createButton = document.querySelector('button[onclick="createBackup()"]');
+    const originalText = createButton.innerHTML;
+    
+    try {
+        // 버튼 상태 변경 (로딩 표시)
+        createButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>백업 생성 중...';
+        createButton.disabled = true;
+
+        const response = await axios.post('/api/admin/backup/create');
+        
+        if (response.data.success) {
+            alert(`백업이 성공적으로 생성되었습니다!\n\n백업명: ${response.data.backup.name}\n데이터 수: ${response.data.backup.size}개 항목`);
+            loadBackupsList(); // 목록 새로고침
+        } else {
+            alert('백업 생성 실패: ' + response.data.message);
+        }
+    } catch (error) {
+        console.error('백업 생성 오류:', error);
+        alert('백업 생성 중 오류가 발생했습니다.');
+    } finally {
+        // 버튼 상태 복원
+        createButton.innerHTML = originalText;
+        createButton.disabled = false;
+    }
+}
+
+// 백업 복원
+async function restoreBackup(backupId, backupName) {
+    // 강력한 확인 메시지
+    const firstConfirm = confirm(
+        `⚠️ 백업 복원 경고 ⚠️\n\n` +
+        `백업 "${backupName}"을(를) 복원하시겠습니까?\n\n` +
+        `🔴 주의사항:\n` +
+        `• 현재 모든 데이터가 완전히 삭제됩니다!\n` +
+        `• 워킹걸, 사진, 광고 데이터가 모두 사라집니다!\n` +
+        `• 이 작업은 되돌릴 수 없습니다!\n\n` +
+        `정말로 계속하시겠습니까?`
+    );
+    
+    if (!firstConfirm) {
+        return;
+    }
+
+    // 두 번째 확인
+    const secondConfirm = confirm(
+        `마지막 확인\n\n` +
+        `"${backupName}" 백업으로 복원하면\n` +
+        `현재 모든 데이터가 삭제되고 백업 시점의 데이터로 교체됩니다.\n\n` +
+        `이 작업을 진행하시겠습니까?\n\n` +
+        `(취소하려면 "취소"를 클릭하세요)`
+    );
+    
+    if (!secondConfirm) {
+        return;
+    }
+
+    try {
+        // 복원 진행 알림
+        alert('백업 복원을 시작합니다. 완료될 때까지 기다려 주세요.');
+
+        const response = await axios.post(`/api/admin/backup/restore/${backupId}`);
+        
+        if (response.data.success) {
+            alert(
+                `백업이 성공적으로 복원되었습니다!\n\n` +
+                `백업명: ${response.data.backup.name}\n` +
+                `복원된 데이터: ${response.data.backup.restored_count}개 항목\n` +
+                `백업 생성일: ${new Date(response.data.backup.backup_date).toLocaleString('ko-KR')}\n\n` +
+                `페이지를 새로고침합니다.`
+            );
+            
+            // 페이지 새로고침으로 복원된 데이터 표시
+            window.location.reload();
+        } else {
+            alert('백업 복원 실패: ' + response.data.message);
+        }
+    } catch (error) {
+        console.error('백업 복원 오류:', error);
+        alert('백업 복원 중 오류가 발생했습니다.');
+    }
+}
+
+// 백업 삭제
+async function deleteBackup(backupId, backupName) {
+    // 확인 메시지
+    const confirmed = confirm(
+        `백업 파일을 삭제하시겠습니까?\n\n` +
+        `백업명: ${backupName}\n\n` +
+        `⚠️ 삭제된 백업 파일은 복구할 수 없습니다!`
+    );
+    
+    if (!confirmed) {
+        return;
+    }
+
+    try {
+        const response = await axios.delete(`/api/admin/backup/delete/${backupId}`);
+        
+        if (response.data.success) {
+            alert(response.data.message);
+            loadBackupsList(); // 목록 새로고침
+        } else {
+            alert('백업 삭제 실패: ' + response.data.message);
+        }
+    } catch (error) {
+        console.error('백업 삭제 오류:', error);
+        alert('백업 삭제 중 오류가 발생했습니다.');
+    }
+}
+
+// 페이지 로드시 백업 목록도 함께 로드하도록 기존 초기화 함수 수정
+// (기존 loadWorkingGirlsList(), loadAdvertisementsList() 함수와 함께 호출)

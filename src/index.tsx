@@ -1786,6 +1786,43 @@ app.get('/admin', async (c) => {
                       <!-- 동적으로 로드됩니다 -->
                   </div>
               </div>
+
+              <!-- 데이터 백업 관리 섹션 -->
+              <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+                  <div class="flex justify-between items-center mb-6">
+                      <h2 class="text-xl font-bold">
+                          <i class="fas fa-database mr-2 text-blue-600"></i>데이터 백업 관리
+                      </h2>
+                      <button onclick="createBackup()" 
+                              class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow-md transition-colors">
+                          <i class="fas fa-save mr-2"></i>백업 생성
+                      </button>
+                  </div>
+
+                  <!-- 백업 안내 메시지 -->
+                  <div class="bg-blue-50 border-l-4 border-blue-400 p-4 mb-6">
+                      <div class="flex">
+                          <div class="flex-shrink-0">
+                              <i class="fas fa-info-circle text-blue-400"></i>
+                          </div>
+                          <div class="ml-3">
+                              <p class="text-sm text-blue-700">
+                                  <strong>백업 시스템:</strong> 최대 5개의 백업이 자동으로 관리됩니다. 새 백업이 생성되면 가장 오래된 백업이 자동 삭제됩니다.
+                                  <br><strong>주의:</strong> 백업 복원시 현재 모든 데이터가 삭제되므로 신중하게 진행하세요.
+                              </p>
+                          </div>
+                      </div>
+                  </div>
+
+                  <!-- 백업 목록 -->
+                  <div id="backup-list" class="space-y-3">
+                      <!-- 백업 목록이 동적으로 로드됩니다 -->
+                      <div class="text-center py-8 text-gray-500">
+                          <i class="fas fa-spinner fa-spin text-xl mb-2"></i>
+                          <p>백업 목록을 불러오는 중...</p>
+                      </div>
+                  </div>
+              </div>
           </div>
 
           <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
@@ -3193,6 +3230,291 @@ app.get('/api/telegram/get-updates', async (c) => {
     }
   } catch (error) {
     return c.json({ success: false, message: error.message })
+  }
+})
+
+// =============================================================================
+// 데이터 백업 시스템 API
+// =============================================================================
+
+// 백업 생성 API (최대 5개 백업 유지)
+app.post('/api/admin/backup/create', async (c) => {
+  const { env } = c
+
+  try {
+    // 현재 날짜/시간을 기반으로 백업명 생성
+    const now = new Date()
+    const backupName = `백업_${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}`
+    
+    console.log('Creating backup:', backupName)
+
+    // 트랜잭션 시작 (백업 메타데이터 생성)
+    const backupMetadata = await env.DB.prepare(`
+      INSERT INTO backup_metadata (backup_name, backup_description)
+      VALUES (?, ?)
+    `).bind(backupName, `전체 데이터 백업 - ${now.toLocaleString('ko-KR')}`).run()
+
+    const backupId = backupMetadata.meta.last_row_id
+
+    // 워킹걸 데이터 백업
+    const workingGirls = await env.DB.prepare(`
+      SELECT * FROM working_girls
+    `).all()
+
+    let backupSize = 0
+    
+    if (workingGirls.results && workingGirls.results.length > 0) {
+      for (const girl of workingGirls.results) {
+        await env.DB.prepare(`
+          INSERT INTO backup_working_girls (
+            backup_id, original_id, user_id, password, nickname, age, height, weight, gender, region,
+            line_id, kakao_id, phone, management_code, agency, conditions, main_photo,
+            is_active, is_recommended, is_vip, fee, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).bind(
+          backupId, girl.id, girl.user_id, girl.password, girl.nickname, girl.age, 
+          girl.height, girl.weight, girl.gender, girl.region, girl.line_id, girl.kakao_id,
+          girl.phone, girl.management_code, girl.agency, girl.conditions, girl.main_photo,
+          girl.is_active, girl.is_recommended, girl.is_vip, girl.fee, girl.created_at, girl.updated_at
+        ).run()
+        backupSize++
+      }
+    }
+
+    // 워킹걸 사진 데이터 백업
+    const photos = await env.DB.prepare(`
+      SELECT * FROM working_girl_photos
+    `).all()
+
+    if (photos.results && photos.results.length > 0) {
+      for (const photo of photos.results) {
+        await env.DB.prepare(`
+          INSERT INTO backup_working_girl_photos (
+            backup_id, original_id, working_girl_id, photo_data, photo_type, photo_size, is_main, uploaded_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `).bind(
+          backupId, photo.id, photo.working_girl_id, photo.photo_data, 
+          photo.photo_type, photo.photo_size, photo.is_main, photo.uploaded_at
+        ).run()
+        backupSize++
+      }
+    }
+
+    // 광고 데이터 백업
+    const ads = await env.DB.prepare(`
+      SELECT * FROM advertisements
+    `).all()
+
+    if (ads.results && ads.results.length > 0) {
+      for (const ad of ads.results) {
+        await env.DB.prepare(`
+          INSERT INTO backup_advertisements (
+            backup_id, original_id, title, content, image_data, link_url, priority_order,
+            is_active, start_date, end_date, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).bind(
+          backupId, ad.id, ad.title, ad.content, ad.image_data, ad.link_url,
+          ad.priority_order, ad.is_active, ad.start_date, ad.end_date, ad.created_at, ad.updated_at
+        ).run()
+        backupSize++
+      }
+    }
+
+    // 백업 크기 업데이트
+    await env.DB.prepare(`
+      UPDATE backup_metadata SET backup_size = ? WHERE id = ?
+    `).bind(backupSize, backupId).run()
+
+    // 5개 초과 백업 삭제 (가장 오래된 것부터)
+    const oldBackups = await env.DB.prepare(`
+      SELECT id FROM backup_metadata ORDER BY backup_date DESC LIMIT -1 OFFSET 5
+    `).all()
+
+    if (oldBackups.results && oldBackups.results.length > 0) {
+      for (const oldBackup of oldBackups.results) {
+        // 관련 백업 데이터 삭제 (CASCADE로 자동 삭제됨)
+        await env.DB.prepare(`DELETE FROM backup_metadata WHERE id = ?`).bind(oldBackup.id).run()
+        console.log('Deleted old backup:', oldBackup.id)
+      }
+    }
+
+    return c.json({
+      success: true,
+      message: `백업이 성공적으로 생성되었습니다. (${backupSize}개 항목)`,
+      backup: {
+        id: backupId,
+        name: backupName,
+        size: backupSize,
+        created_at: now.toISOString()
+      }
+    })
+
+  } catch (error) {
+    console.error('Backup creation error:', error)
+    return c.json({ success: false, message: '백업 생성에 실패했습니다.' }, 500)
+  }
+})
+
+// 백업 목록 조회 API
+app.get('/api/admin/backup/list', async (c) => {
+  const { env } = c
+
+  try {
+    const backups = await env.DB.prepare(`
+      SELECT id, backup_name, backup_description, backup_size, backup_date, created_at
+      FROM backup_metadata 
+      ORDER BY backup_date DESC
+    `).all()
+
+    return c.json({
+      success: true,
+      backups: backups.results || []
+    })
+
+  } catch (error) {
+    console.error('Backup list error:', error)
+    return c.json({ success: false, message: '백업 목록을 불러오는데 실패했습니다.' }, 500)
+  }
+})
+
+// 백업 복원 API (현재 데이터 삭제 후 복원)
+app.post('/api/admin/backup/restore/:backupId', async (c) => {
+  const { env } = c
+  const backupId = c.req.param('backupId')
+
+  try {
+    console.log('Starting backup restore for backup ID:', backupId)
+
+    // 백업 존재 확인
+    const backup = await env.DB.prepare(`
+      SELECT * FROM backup_metadata WHERE id = ?
+    `).bind(backupId).first()
+
+    if (!backup) {
+      return c.json({ success: false, message: '백업 파일을 찾을 수 없습니다.' }, 404)
+    }
+
+    // 1. 현재 데이터 모두 삭제
+    await env.DB.prepare(`DELETE FROM working_girl_photos`).run()
+    await env.DB.prepare(`DELETE FROM working_girls`).run()
+    await env.DB.prepare(`DELETE FROM advertisements`).run()
+    console.log('Current data deleted')
+
+    let restoredCount = 0
+
+    // 2. 워킹걸 데이터 복원
+    const backupWorkingGirls = await env.DB.prepare(`
+      SELECT * FROM backup_working_girls WHERE backup_id = ? ORDER BY original_id
+    `).bind(backupId).all()
+
+    const idMapping = {} // 원래 ID -> 새로운 ID 매핑
+
+    if (backupWorkingGirls.results && backupWorkingGirls.results.length > 0) {
+      for (const girl of backupWorkingGirls.results) {
+        const result = await env.DB.prepare(`
+          INSERT INTO working_girls (
+            user_id, password, nickname, age, height, weight, gender, region,
+            line_id, kakao_id, phone, management_code, agency, conditions, main_photo,
+            is_active, is_recommended, is_vip, fee, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).bind(
+          girl.user_id, girl.password, girl.nickname, girl.age, girl.height, girl.weight,
+          girl.gender, girl.region, girl.line_id, girl.kakao_id, girl.phone,
+          girl.management_code, girl.agency, girl.conditions, girl.main_photo,
+          girl.is_active, girl.is_recommended, girl.is_vip, girl.fee, girl.created_at, girl.updated_at
+        ).run()
+
+        idMapping[girl.original_id] = result.meta.last_row_id
+        restoredCount++
+      }
+    }
+
+    // 3. 워킹걸 사진 데이터 복원
+    const backupPhotos = await env.DB.prepare(`
+      SELECT * FROM backup_working_girl_photos WHERE backup_id = ? ORDER BY original_id
+    `).bind(backupId).all()
+
+    if (backupPhotos.results && backupPhotos.results.length > 0) {
+      for (const photo of backupPhotos.results) {
+        const newWorkingGirlId = idMapping[photo.working_girl_id]
+        if (newWorkingGirlId) {
+          await env.DB.prepare(`
+            INSERT INTO working_girl_photos (
+              working_girl_id, photo_data, photo_type, photo_size, is_main, uploaded_at
+            ) VALUES (?, ?, ?, ?, ?, ?)
+          `).bind(
+            newWorkingGirlId, photo.photo_data, photo.photo_type,
+            photo.photo_size, photo.is_main, photo.uploaded_at
+          ).run()
+          restoredCount++
+        }
+      }
+    }
+
+    // 4. 광고 데이터 복원
+    const backupAds = await env.DB.prepare(`
+      SELECT * FROM backup_advertisements WHERE backup_id = ? ORDER BY original_id
+    `).bind(backupId).all()
+
+    if (backupAds.results && backupAds.results.length > 0) {
+      for (const ad of backupAds.results) {
+        await env.DB.prepare(`
+          INSERT INTO advertisements (
+            title, content, image_data, link_url, priority_order,
+            is_active, start_date, end_date, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).bind(
+          ad.title, ad.content, ad.image_data, ad.link_url, ad.priority_order,
+          ad.is_active, ad.start_date, ad.end_date, ad.created_at, ad.updated_at
+        ).run()
+        restoredCount++
+      }
+    }
+
+    console.log('Backup restore completed:', restoredCount, 'items restored')
+
+    return c.json({
+      success: true,
+      message: `백업이 성공적으로 복원되었습니다. (${restoredCount}개 항목)`,
+      backup: {
+        name: backup.backup_name,
+        restored_count: restoredCount,
+        backup_date: backup.backup_date
+      }
+    })
+
+  } catch (error) {
+    console.error('Backup restore error:', error)
+    return c.json({ success: false, message: '백업 복원에 실패했습니다.' }, 500)
+  }
+})
+
+// 백업 삭제 API
+app.delete('/api/admin/backup/delete/:backupId', async (c) => {
+  const { env } = c
+  const backupId = c.req.param('backupId')
+
+  try {
+    // 백업 존재 확인
+    const backup = await env.DB.prepare(`
+      SELECT backup_name FROM backup_metadata WHERE id = ?
+    `).bind(backupId).first()
+
+    if (!backup) {
+      return c.json({ success: false, message: '백업 파일을 찾을 수 없습니다.' }, 404)
+    }
+
+    // 백업 삭제 (CASCADE로 관련 데이터 자동 삭제)
+    await env.DB.prepare(`DELETE FROM backup_metadata WHERE id = ?`).bind(backupId).run()
+
+    return c.json({
+      success: true,
+      message: `백업 "${backup.backup_name}"이(가) 삭제되었습니다.`
+    })
+
+  } catch (error) {
+    console.error('Backup delete error:', error)
+    return c.json({ success: false, message: '백업 삭제에 실패했습니다.' }, 500)
   }
 })
 
