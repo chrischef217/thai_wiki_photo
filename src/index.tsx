@@ -1814,6 +1814,49 @@ app.get('/admin', async (c) => {
                       </div>
                   </div>
 
+                  <!-- 엑셀 가져오기/내보내기 섹션 -->
+                  <div class="bg-green-50 border border-green-200 rounded-lg p-6 mb-6">
+                      <h3 class="text-lg font-semibold text-green-800 mb-4">
+                          <i class="fas fa-file-excel text-green-600 mr-2"></i>엑셀 파일 관리
+                      </h3>
+                      
+                      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <!-- 엑셀 업로드 -->
+                          <div class="space-y-4">
+                              <h4 class="font-medium text-green-700">
+                                  <i class="fas fa-upload mr-2"></i>엑셀 파일로 데이터 가져오기
+                              </h4>
+                              <div class="space-y-3">
+                                  <input type="file" id="excel-upload" accept=".csv,.xlsx,.xls" 
+                                         class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-green-50 file:text-green-700 hover:file:bg-green-100">
+                                  <button onclick="importExcelFile()" 
+                                          class="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors">
+                                      <i class="fas fa-file-import mr-2"></i>가져오기
+                                  </button>
+                                  <p class="text-xs text-green-600">
+                                      ⚠️ 현재 모든 데이터가 삭제되고 파일의 데이터로 교체됩니다
+                                  </p>
+                              </div>
+                          </div>
+
+                          <!-- 엑셀 다운로드 -->
+                          <div class="space-y-4">
+                              <h4 class="font-medium text-green-700">
+                                  <i class="fas fa-download mr-2"></i>현재 데이터를 엑셀로 다운로드
+                              </h4>
+                              <div class="space-y-3">
+                                  <button onclick="exportCurrentData()" 
+                                          class="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors">
+                                      <i class="fas fa-file-excel mr-2"></i>현재 데이터 다운로드
+                                  </button>
+                                  <p class="text-xs text-blue-600">
+                                      현재 데이터베이스의 모든 워킹걸, 사진, 광고 데이터를 CSV 형식으로 다운로드
+                                  </p>
+                              </div>
+                          </div>
+                      </div>
+                  </div>
+
                   <!-- 백업 목록 -->
                   <div id="backup-list" class="space-y-3">
                       <!-- 백업 목록이 동적으로 로드됩니다 -->
@@ -3517,6 +3560,332 @@ app.delete('/api/admin/backup/delete/:backupId', async (c) => {
   } catch (error) {
     console.error('Backup delete error:', error)
     return c.json({ success: false, message: '백업 삭제에 실패했습니다.' }, 500)
+  }
+})
+
+// 백업 데이터 엑셀(CSV) 다운로드 API
+app.get('/api/admin/backup/export/:backupId', async (c) => {
+  const { env } = c
+  const backupId = c.req.param('backupId')
+
+  try {
+    // 백업 존재 확인
+    const backup = await env.DB.prepare(`
+      SELECT * FROM backup_metadata WHERE id = ?
+    `).bind(backupId).first()
+
+    if (!backup) {
+      return c.json({ success: false, message: '백업 파일을 찾을 수 없습니다.' }, 404)
+    }
+
+    // 워킹걸 데이터 조회
+    const workingGirls = await env.DB.prepare(`
+      SELECT * FROM backup_working_girls WHERE backup_id = ? ORDER BY original_id
+    `).bind(backupId).all()
+
+    // 워킹걸 사진 데이터 조회
+    const photos = await env.DB.prepare(`
+      SELECT * FROM backup_working_girl_photos WHERE backup_id = ? ORDER BY working_girl_id, original_id
+    `).bind(backupId).all()
+
+    // 광고 데이터 조회
+    const advertisements = await env.DB.prepare(`
+      SELECT * FROM backup_advertisements WHERE backup_id = ? ORDER BY original_id
+    `).bind(backupId).all()
+
+    // CSV 헤더 정의
+    let csvContent = ''
+    
+    // 워킹걸 데이터 CSV
+    csvContent += '워킹걸 데이터\n'
+    csvContent += 'ID,사용자ID,비밀번호,닉네임,나이,키,몸무게,성별,지역,라인ID,카카오ID,전화번호,관리코드,에이전시,조건,메인사진,활성상태,추천상태,VIP상태,요금,생성일시,수정일시\n'
+    
+    if (workingGirls.results && workingGirls.results.length > 0) {
+      for (const girl of workingGirls.results) {
+        csvContent += `${girl.original_id},"${girl.user_id}","${girl.password}","${girl.nickname}",${girl.age},${girl.height},${girl.weight},"${girl.gender}","${girl.region}","${girl.line_id || ''}","${girl.kakao_id || ''}","${girl.phone || ''}","${girl.management_code}","${girl.agency || ''}","${girl.conditions || ''}","${girl.main_photo || ''}",${girl.is_active ? 1 : 0},${girl.is_recommended ? 1 : 0},${girl.is_vip ? 1 : 0},"${girl.fee || ''}","${girl.created_at}","${girl.updated_at}"\n`
+      }
+    }
+
+    csvContent += '\n\n'
+
+    // 워킹걸 사진 데이터 CSV
+    csvContent += '워킹걸 사진 데이터\n'
+    csvContent += 'ID,워킹걸ID,사진데이터,사진타입,사진크기,메인여부,업로드일시\n'
+    
+    if (photos.results && photos.results.length > 0) {
+      for (const photo of photos.results) {
+        // 사진 데이터는 용량 문제로 처음 100자만 표시
+        const photoDataPreview = photo.photo_data ? photo.photo_data.substring(0, 100) + '...' : ''
+        csvContent += `${photo.original_id},${photo.working_girl_id},"${photoDataPreview}","${photo.photo_type}",${photo.photo_size},${photo.is_main ? 1 : 0},"${photo.uploaded_at}"\n`
+      }
+    }
+
+    csvContent += '\n\n'
+
+    // 광고 데이터 CSV
+    csvContent += '광고 데이터\n'
+    csvContent += 'ID,제목,내용,이미지데이터,링크URL,우선순위,활성상태,시작일,종료일,생성일시,수정일시\n'
+    
+    if (advertisements.results && advertisements.results.length > 0) {
+      for (const ad of advertisements.results) {
+        // 이미지 데이터는 용량 문제로 처음 100자만 표시
+        const imageDataPreview = ad.image_data ? ad.image_data.substring(0, 100) + '...' : ''
+        csvContent += `${ad.original_id},"${ad.title}","${ad.content}","${imageDataPreview}","${ad.link_url || ''}",${ad.priority_order},${ad.is_active ? 1 : 0},"${ad.start_date || ''}","${ad.end_date || ''}","${ad.created_at}","${ad.updated_at}"\n`
+      }
+    }
+
+    // 파일명 생성 (한국 시간 기준)
+    const now = new Date()
+    const koreanTime = new Date(now.getTime() + (9 * 60 * 60 * 1000))
+    const fileName = `백업_${backup.backup_name}_${koreanTime.getFullYear()}${String(koreanTime.getMonth() + 1).padStart(2, '0')}${String(koreanTime.getDate()).padStart(2, '0')}.csv`
+
+    // BOM 추가 (한글 엑셀 호환성)
+    const bom = '\uFEFF'
+    const finalContent = bom + csvContent
+
+    return new Response(finalContent, {
+      headers: {
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition': `attachment; filename="${encodeURIComponent(fileName)}"`,
+        'Cache-Control': 'no-cache'
+      }
+    })
+
+  } catch (error) {
+    console.error('Backup export error:', error)
+    return c.json({ success: false, message: '백업 내보내기에 실패했습니다.' }, 500)
+  }
+})
+
+// 엑셀(CSV) 파일 업로드로 데이터 생성 API
+app.post('/api/admin/backup/import', async (c) => {
+  const { env } = c
+
+  try {
+    const formData = await c.req.formData()
+    const file = formData.get('file') as File
+    
+    if (!file) {
+      return c.json({ success: false, message: 'CSV 파일을 선택해주세요.' }, 400)
+    }
+
+    // 파일 확장자 검사
+    const fileName = file.name.toLowerCase()
+    if (!fileName.endsWith('.csv') && !fileName.endsWith('.xlsx') && !fileName.endsWith('.xls')) {
+      return c.json({ success: false, message: 'CSV 또는 엑셀 파일만 업로드 가능합니다.' }, 400)
+    }
+
+    // 파일 크기 제한 (10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      return c.json({ success: false, message: '파일 크기는 10MB 이하여야 합니다.' }, 400)
+    }
+
+    const fileContent = await file.text()
+    const lines = fileContent.split('\n')
+
+    let importedCount = 0
+    let currentSection = ''
+    let headerProcessed = false
+
+    // 기존 데이터 삭제 (경고: 모든 데이터가 삭제됨)
+    await env.DB.prepare(`DELETE FROM working_girl_photos`).run()
+    await env.DB.prepare(`DELETE FROM working_girls`).run()
+    await env.DB.prepare(`DELETE FROM advertisements`).run()
+
+    const workingGirlIdMapping = {} // 원래 ID -> 새로운 ID 매핑
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim()
+      
+      if (!line) continue
+
+      // 섹션 확인
+      if (line === '워킹걸 데이터') {
+        currentSection = 'working_girls'
+        headerProcessed = false
+        continue
+      } else if (line === '워킹걸 사진 데이터') {
+        currentSection = 'photos'
+        headerProcessed = false
+        continue
+      } else if (line === '광고 데이터') {
+        currentSection = 'advertisements'
+        headerProcessed = false
+        continue
+      }
+
+      // 헤더 행 스킵
+      if (!headerProcessed && (line.includes('ID,') || line.includes('id,'))) {
+        headerProcessed = true
+        continue
+      }
+
+      // 데이터 처리
+      if (currentSection && headerProcessed && line.includes(',')) {
+        try {
+          if (currentSection === 'working_girls') {
+            const cols = parseCSVLine(line)
+            if (cols.length >= 20) {
+              const originalId = parseInt(cols[0])
+              const result = await env.DB.prepare(`
+                INSERT INTO working_girls (
+                  user_id, password, nickname, age, height, weight, gender, region,
+                  line_id, kakao_id, phone, management_code, agency, conditions, main_photo,
+                  is_active, is_recommended, is_vip, fee, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              `).bind(
+                cols[1], cols[2], cols[3], parseInt(cols[4]) || 20, parseInt(cols[5]) || 160,
+                parseInt(cols[6]) || 50, cols[7], cols[8], cols[9], cols[10], cols[11],
+                cols[12], cols[13], cols[14], cols[15], parseInt(cols[16]) || 1,
+                parseInt(cols[17]) || 0, parseInt(cols[18]) || 0, cols[19], cols[20], cols[21]
+              ).run()
+
+              workingGirlIdMapping[originalId] = result.meta.last_row_id
+              importedCount++
+            }
+          } else if (currentSection === 'advertisements') {
+            const cols = parseCSVLine(line)
+            if (cols.length >= 10) {
+              await env.DB.prepare(`
+                INSERT INTO advertisements (
+                  title, content, image_data, link_url, priority_order,
+                  is_active, start_date, end_date, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              `).bind(
+                cols[1], cols[2], cols[3], cols[4], parseInt(cols[5]) || 0,
+                parseInt(cols[6]) || 1, cols[7], cols[8], cols[9], cols[10]
+              ).run()
+              importedCount++
+            }
+          }
+        } catch (error) {
+          console.error(`CSV 라인 처리 오류 (라인 ${i + 1}):`, error)
+          // 개별 라인 오류는 무시하고 계속 진행
+        }
+      }
+    }
+
+    return c.json({
+      success: true,
+      message: `CSV 파일에서 ${importedCount}개 항목이 성공적으로 가져와졌습니다.`,
+      imported_count: importedCount
+    })
+
+  } catch (error) {
+    console.error('CSV import error:', error)
+    return c.json({ success: false, message: 'CSV 파일 가져오기에 실패했습니다.' }, 500)
+  }
+})
+
+// CSV 라인 파싱 헬퍼 함수
+function parseCSVLine(line: string): string[] {
+  const result = []
+  let current = ''
+  let inQuotes = false
+  
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i]
+    
+    if (char === '"') {
+      if (inQuotes && line[i + 1] === '"') {
+        current += '"'
+        i++ // 다음 따옴표 스킵
+      } else {
+        inQuotes = !inQuotes
+      }
+    } else if (char === ',' && !inQuotes) {
+      result.push(current.trim())
+      current = ''
+    } else {
+      current += char
+    }
+  }
+  
+  result.push(current.trim())
+  return result
+}
+
+// 현재 데이터를 엑셀(CSV)로 다운로드 API
+app.get('/api/admin/data/export', async (c) => {
+  const { env } = c
+
+  try {
+    // 현재 워킹걸 데이터 조회
+    const workingGirls = await env.DB.prepare(`
+      SELECT * FROM working_girls ORDER BY id
+    `).all()
+
+    // 현재 워킹걸 사진 데이터 조회
+    const photos = await env.DB.prepare(`
+      SELECT * FROM working_girl_photos ORDER BY working_girl_id, id
+    `).all()
+
+    // 현재 광고 데이터 조회
+    const advertisements = await env.DB.prepare(`
+      SELECT * FROM advertisements ORDER BY id
+    `).all()
+
+    // CSV 헤더 정의
+    let csvContent = ''
+    
+    // 워킹걸 데이터 CSV
+    csvContent += '워킹걸 데이터\n'
+    csvContent += 'ID,사용자ID,비밀번호,닉네임,나이,키,몸무게,성별,지역,라인ID,카카오ID,전화번호,관리코드,에이전시,조건,메인사진,활성상태,추천상태,VIP상태,요금,생성일시,수정일시\n'
+    
+    if (workingGirls.results && workingGirls.results.length > 0) {
+      for (const girl of workingGirls.results) {
+        csvContent += `${girl.id},"${girl.user_id}","${girl.password}","${girl.nickname}",${girl.age},${girl.height},${girl.weight},"${girl.gender}","${girl.region}","${girl.line_id || ''}","${girl.kakao_id || ''}","${girl.phone || ''}","${girl.management_code}","${girl.agency || ''}","${girl.conditions || ''}","${girl.main_photo || ''}",${girl.is_active ? 1 : 0},${girl.is_recommended ? 1 : 0},${girl.is_vip ? 1 : 0},"${girl.fee || ''}","${girl.created_at}","${girl.updated_at}"\n`
+      }
+    }
+
+    csvContent += '\n\n'
+
+    // 워킹걸 사진 데이터 CSV
+    csvContent += '워킹걸 사진 데이터\n'
+    csvContent += 'ID,워킹걸ID,사진데이터,사진타입,사진크기,메인여부,업로드일시\n'
+    
+    if (photos.results && photos.results.length > 0) {
+      for (const photo of photos.results) {
+        // 사진 데이터는 용량 문제로 처음 100자만 표시
+        const photoDataPreview = photo.photo_data ? photo.photo_data.substring(0, 100) + '...' : ''
+        csvContent += `${photo.id},${photo.working_girl_id},"${photoDataPreview}","${photo.photo_type}",${photo.photo_size},${photo.is_main ? 1 : 0},"${photo.uploaded_at}"\n`
+      }
+    }
+
+    csvContent += '\n\n'
+
+    // 광고 데이터 CSV
+    csvContent += '광고 데이터\n'
+    csvContent += 'ID,제목,내용,이미지데이터,링크URL,우선순위,활성상태,시작일,종료일,생성일시,수정일시\n'
+    
+    if (advertisements.results && advertisements.results.length > 0) {
+      for (const ad of advertisements.results) {
+        // 이미지 데이터는 용량 문제로 처음 100자만 표시
+        const imageDataPreview = ad.image_data ? ad.image_data.substring(0, 100) + '...' : ''
+        csvContent += `${ad.id},"${ad.title}","${ad.content}","${imageDataPreview}","${ad.link_url || ''}",${ad.priority_order},${ad.is_active ? 1 : 0},"${ad.start_date || ''}","${ad.end_date || ''}","${ad.created_at}","${ad.updated_at}"\n`
+      }
+    }
+
+    // 파일명 생성 (한국 시간 기준)
+    const now = new Date()
+    const koreanTime = new Date(now.getTime() + (9 * 60 * 60 * 1000))
+    const fileName = `현재데이터_${koreanTime.getFullYear()}${String(koreanTime.getMonth() + 1).padStart(2, '0')}${String(koreanTime.getDate()).padStart(2, '0')}_${String(koreanTime.getHours()).padStart(2, '0')}${String(koreanTime.getMinutes()).padStart(2, '0')}.csv`
+
+    // BOM 추가 (한글 엑셀 호환성)
+    const bom = '\uFEFF'
+    const finalContent = bom + csvContent
+
+    return new Response(finalContent, {
+      headers: {
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition': `attachment; filename="${encodeURIComponent(fileName)}"`,
+        'Cache-Control': 'no-cache'
+      }
+    })
+
+  } catch (error) {
+    console.error('Current data export error:', error)
+    return c.json({ success: false, message: '현재 데이터 내보내기에 실패했습니다.' }, 500)
   }
 })
 

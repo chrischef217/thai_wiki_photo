@@ -1415,6 +1415,10 @@ function displayBackupsList(backups) {
                                 class="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-sm transition-colors">
                             <i class="fas fa-undo mr-1"></i>복원
                         </button>
+                        <button onclick="exportBackupToExcel(${backup.id}, '${backup.backup_name}')" 
+                                class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm transition-colors">
+                            <i class="fas fa-file-excel mr-1"></i>엑셀
+                        </button>
                         <button onclick="deleteBackup(${backup.id}, '${backup.backup_name}')" 
                                 class="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm transition-colors">
                             <i class="fas fa-trash mr-1"></i>삭제
@@ -1552,5 +1556,156 @@ async function deleteBackup(backupId, backupName) {
     }
 }
 
-// 페이지 로드시 백업 목록도 함께 로드하도록 기존 초기화 함수 수정
-// (기존 loadWorkingGirlsList(), loadAdvertisementsList() 함수와 함께 호출)
+// =============================================================================
+// 엑셀 파일 가져오기/내보내기 기능
+// =============================================================================
+
+// 백업 데이터를 엑셀로 다운로드
+async function exportBackupToExcel(backupId, backupName) {
+    try {
+        // 확인 메시지
+        const confirmed = confirm(
+            `백업 "${backupName}"을(를) 엑셀 파일로 다운로드하시겠습니까?\n\n` +
+            `엑셀 파일에는 워킹걸, 사진, 광고 데이터가 포함됩니다.`
+        );
+        
+        if (!confirmed) {
+            return;
+        }
+
+        // 다운로드 링크 생성하여 클릭
+        const downloadUrl = `/api/admin/backup/export/${backupId}`;
+        const link = document.createElement('a');
+        link.href = downloadUrl;
+        link.download = `백업_${backupName}.csv`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        alert('엑셀 다운로드가 시작되었습니다.');
+
+    } catch (error) {
+        console.error('엑셀 다운로드 오류:', error);
+        alert('엑셀 다운로드 중 오류가 발생했습니다.');
+    }
+}
+
+// 현재 데이터를 엑셀로 다운로드
+async function exportCurrentData() {
+    try {
+        // 확인 메시지
+        const confirmed = confirm(
+            '현재 데이터를 엑셀 파일로 다운로드하시겠습니까?\n\n' +
+            '• 현재 데이터베이스의 모든 워킹걸, 사진, 광고 데이터가 포함됩니다.\n' +
+            '• 파일은 CSV 형식으로 다운로드되어 엑셀에서 열 수 있습니다.'
+        );
+        
+        if (!confirmed) {
+            return;
+        }
+
+        // 현재 데이터를 직접 다운로드
+        const downloadUrl = '/api/admin/data/export';
+        const link = document.createElement('a');
+        link.href = downloadUrl;
+        
+        // 현재 한국 시간으로 파일명 생성
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const date = String(now.getDate()).padStart(2, '0');
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        
+        link.download = `현재데이터_${year}${month}${date}_${hours}${minutes}.csv`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        alert('현재 데이터 엑셀 다운로드가 시작되었습니다.');
+
+    } catch (error) {
+        console.error('현재 데이터 엑셀 다운로드 오류:', error);
+        alert('엑셀 다운로드 중 오류가 발생했습니다.');
+    }
+}
+
+// 엑셀 파일로 데이터 가져오기
+async function importExcelFile() {
+    const fileInput = document.getElementById('excel-upload');
+    const file = fileInput.files[0];
+    
+    if (!file) {
+        alert('업로드할 CSV 또는 엑셀 파일을 선택해주세요.');
+        return;
+    }
+
+    // 강력한 확인 메시지
+    const firstConfirm = confirm(
+        `⚠️ 데이터 가져오기 경고 ⚠️\n\n` +
+        `선택한 파일: ${file.name}\n` +
+        `파일 크기: ${(file.size / 1024 / 1024).toFixed(2)} MB\n\n` +
+        `🔴 주의사항:\n` +
+        `• 현재 모든 데이터가 완전히 삭제됩니다!\n` +
+        `• 워킹걸, 사진, 광고 데이터가 모두 사라집니다!\n` +
+        `• 파일의 데이터로 완전히 교체됩니다!\n` +
+        `• 이 작업은 되돌릴 수 없습니다!\n\n` +
+        `정말로 계속하시겠습니까?`
+    );
+    
+    if (!firstConfirm) {
+        return;
+    }
+
+    // 두 번째 확인
+    const secondConfirm = confirm(
+        `마지막 확인\n\n` +
+        `"${file.name}" 파일로 데이터를 가져오면\n` +
+        `현재 모든 데이터가 삭제되고 파일의 데이터로 교체됩니다.\n\n` +
+        `이 작업을 진행하시겠습니까?\n\n` +
+        `(취소하려면 "취소"를 클릭하세요)`
+    );
+    
+    if (!secondConfirm) {
+        return;
+    }
+
+    try {
+        // FormData로 파일 전송
+        const formData = new FormData();
+        formData.append('file', file);
+
+        // 업로드 진행 알림
+        alert('파일 업로드를 시작합니다. 완료될 때까지 기다려 주세요.');
+
+        const response = await axios.post('/api/admin/backup/import', formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data'
+            }
+        });
+        
+        if (response.data.success) {
+            alert(
+                `엑셀 파일 가져오기가 성공적으로 완료되었습니다!\n\n` +
+                `가져온 데이터: ${response.data.imported_count}개 항목\n\n` +
+                `페이지를 새로고침합니다.`
+            );
+            
+            // 파일 입력 초기화
+            fileInput.value = '';
+            
+            // 페이지 새로고침으로 새 데이터 표시
+            window.location.reload();
+        } else {
+            alert('파일 가져오기 실패: ' + response.data.message);
+        }
+
+    } catch (error) {
+        console.error('엑셀 파일 가져오기 오류:', error);
+        if (error.response && error.response.data && error.response.data.message) {
+            alert('파일 가져오기 실패: ' + error.response.data.message);
+        } else {
+            alert('파일 가져오기 중 오류가 발생했습니다.');
+        }
+    }
+}
