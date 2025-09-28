@@ -203,15 +203,16 @@ function loadWorkingGirls(searchQuery = '', resetData = true) {
             // 데이터 병합 또는 교체
             if (resetData) {
                 workingGirlsData = newWorkingGirls;
+                // 전체 데이터로 UI 업데이트
+                displayWorkingGirls(workingGirlsData, true);
             } else {
                 workingGirlsData = [...workingGirlsData, ...newWorkingGirls];
+                // 새로운 데이터만 UI에 추가
+                displayWorkingGirls(newWorkingGirls, false);
             }
             
             // 페이지네이션 상태 업데이트
             hasMoreData = pagination.hasMore !== undefined ? pagination.hasMore : newWorkingGirls.length === currentLimit;
-            
-            // UI 업데이트
-            displayWorkingGirls(workingGirlsData, resetData);
             
             // 성공적인 로딩 후 페이지 번호 증가
             currentPage++;
