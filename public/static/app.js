@@ -396,8 +396,13 @@ function displayWorkingGirls(workingGirls, resetContent = true) {
             mainPhoto = girl.main_photo;
         }
         
-        const recommendedBadge = girl.is_recommended ? 
-            '<div class="absolute top-2 left-2 bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-2 py-1 rounded-full text-xs font-bold recommended-badge"><i class="fas fa-star mr-1"></i>추천</div>' : '';
+        // VIP 뱃지 (왕관 스타일)
+        const vipBadge = girl.is_vip ? 
+            '<div class="absolute top-2 left-2 bg-gradient-to-br from-yellow-400 via-yellow-500 to-amber-600 text-black px-3 py-1 rounded-lg text-xs font-bold vip-badge shadow-xl border-2 border-yellow-300 z-10 transform hover:scale-105 transition-transform"><span class="text-yellow-900">👑</span> <span class="text-yellow-900 font-extrabold">VIP</span></div>' : '';
+        
+        // 추천 뱃지 (VIP가 없을 때만 표시)
+        const recommendedBadge = !girl.is_vip && girl.is_recommended ? 
+            '<div class="absolute top-2 left-2 bg-gradient-to-r from-orange-500 to-red-500 text-white px-2 py-1 rounded-full text-xs font-bold recommended-badge shadow-lg"><i class="fas fa-star mr-1"></i>추천</div>' : '';
         
         return `
             <div class="working-girl-card bg-white rounded-lg shadow-md overflow-hidden" onclick="showWorkingGirlDetail(${girl.id})">
@@ -411,6 +416,7 @@ function displayWorkingGirls(workingGirls, resetContent = true) {
                             <div>${girl.nickname}</div>
                         </div>
                     </div>
+                    ${vipBadge}
                     ${recommendedBadge}
                     ${!girl.is_active ? '<div class="absolute top-2 right-2 bg-gray-500 text-white px-2 py-1 rounded text-xs">비활성</div>' : ''}
                 </div>
@@ -820,7 +826,8 @@ function showWorkingGirlRegister() {
                                 <select id="reg-gender" required 
                                         class="w-full p-3 border border-gray-300 rounded-lg focus:border-thai-red focus:outline-none">
                                     <option value="">선택하세요</option>
-                                    <option value="여자">여자</option>
+                                    <option value="여성">여성</option>
+                                    <option value="레이디보이">레이디보이</option>
                                     <option value="트랜스젠더">트랜스젠더</option>
                                     <option value="레이디보이">레이디보이</option>
                                 </select>
@@ -1209,7 +1216,7 @@ function showWorkingGirlEditModal(user) {
                                 <select id="edit-gender" required 
                                         class="w-full p-3 border border-gray-300 rounded-lg focus:border-thai-red focus:outline-none">
                                     <option value="">선택하세요</option>
-                                    <option value="여자" ${user.gender === '여자' ? 'selected' : ''}>여자</option>
+                                    <option value="여성" ${user.gender === '여성' ? 'selected' : ''}>여성</option>
                                     <option value="트랜스젠더" ${user.gender === '트랜스젠더' ? 'selected' : ''}>트랜스젠더</option>
                                     <option value="레이디보이" ${user.gender === '레이디보이' ? 'selected' : ''}>레이디보이</option>
                                 </select>
@@ -1289,11 +1296,12 @@ function showWorkingGirlEditModal(user) {
     document.getElementById('modal-container').innerHTML = modalHTML;
 }
 
-// 광고 데이터 로드
+// 광고 데이터 로드 (향상된 버전)
 function loadAdvertisements() {
     axios.get('/api/advertisements')
         .then(response => {
             advertisementsData = response.data.advertisements || [];
+            adSettings = response.data.settings || {};
             setupAdSlider();
         })
         .catch(error => {
@@ -1301,20 +1309,27 @@ function loadAdvertisements() {
         });
 }
 
-// 광고 슬라이더 설정
+// 광고 슬라이더 설정 (터치 기능 포함)
+let adAutoSlideInterval = null;
+let adSettings = {};
+let touchStartX = 0;
+let touchEndX = 0;
+let isSwiping = false;
+
 function setupAdSlider() {
     if (advertisementsData.length === 0) return;
 
     const adSlider = document.getElementById('ad-slider');
+    const adBanner = document.getElementById('ad-banner');
     
-    // 광고 HTML 생성
+    // 광고 HTML 생성 (개별 스크롤 시간 지원)
     const adsHTML = advertisementsData.map((ad, index) => {
         const imgElement = `<img src="${ad.image_url}" alt="${ad.title || '광고'}" class="h-full w-auto object-contain" onerror="this.style.display='none'">`;
         
         if (ad.link_url && ad.link_url.trim()) {
             // 링크가 있는 경우 클릭 가능한 요소로 래핑
             return `
-                <div class="min-w-full h-full flex items-center justify-center ad-slide">
+                <div class="min-w-full h-full flex items-center justify-center ad-slide" data-scroll-interval="${ad.scroll_interval || 3000}">
                     <a href="${ad.link_url}" target="_blank" rel="noopener noreferrer" class="h-full flex items-center justify-center cursor-pointer" title="광고 페이지로 이동">
                         ${imgElement}
                     </a>
@@ -1323,7 +1338,7 @@ function setupAdSlider() {
         } else {
             // 링크가 없는 경우 일반 이미지
             return `
-                <div class="min-w-full h-full flex items-center justify-center ad-slide">
+                <div class="min-w-full h-full flex items-center justify-center ad-slide" data-scroll-interval="${ad.scroll_interval || 3000}">
                     ${imgElement}
                 </div>
             `;
@@ -1332,12 +1347,126 @@ function setupAdSlider() {
     
     adSlider.innerHTML = adsHTML;
 
-    // 자동 슬라이드 시작
+    // 터치 이벤트 리스너 추가
     if (advertisementsData.length > 1) {
-        setInterval(() => {
-            currentAd = (currentAd + 1) % advertisementsData.length;
-            adSlider.style.transform = `translateX(-${currentAd * 100}%)`;
-        }, 3000); // 3초마다 변경
+        addTouchListeners(adBanner);
+        startAutoSlide();
+    }
+}
+
+// 터치 이벤트 리스너 추가 (스와이프 기능)
+function addTouchListeners(element) {
+    // 터치 시작
+    element.addEventListener('touchstart', (e) => {
+        touchStartX = e.changedTouches[0].screenX;
+        isSwiping = true;
+        pauseAutoSlide(); // 터치 시작 시 자동 스크롤 일시정지
+    }, { passive: true });
+
+    // 터치 이동
+    element.addEventListener('touchmove', (e) => {
+        if (!isSwiping) return;
+        e.preventDefault(); // 페이지 스크롤 방지
+    }, { passive: false });
+
+    // 터치 끝
+    element.addEventListener('touchend', (e) => {
+        if (!isSwiping) return;
+        
+        touchEndX = e.changedTouches[0].screenX;
+        handleSwipeGesture();
+        isSwiping = false;
+        
+        // 터치 후 1초 후에 자동 스크롤 재시작
+        setTimeout(() => {
+            startAutoSlide();
+        }, 1000);
+    }, { passive: true });
+
+    // 마우스 이벤트 (데스크톱 지원)
+    element.addEventListener('mousedown', (e) => {
+        touchStartX = e.screenX;
+        isSwiping = true;
+        pauseAutoSlide();
+    });
+
+    element.addEventListener('mouseup', (e) => {
+        if (!isSwiping) return;
+        
+        touchEndX = e.screenX;
+        handleSwipeGesture();
+        isSwiping = false;
+        
+        setTimeout(() => {
+            startAutoSlide();
+        }, 1000);
+    });
+}
+
+// 스와이프 제스처 처리
+function handleSwipeGesture() {
+    const swipeDistance = touchEndX - touchStartX;
+    const minSwipeDistance = 50; // 최소 스와이프 거리 (픽셀)
+    
+    if (Math.abs(swipeDistance) < minSwipeDistance) return;
+    
+    if (swipeDistance > 0) {
+        // 오른쪽으로 스와이프 - 이전 광고
+        goToPrevAd();
+    } else {
+        // 왼쪽으로 스와이프 - 다음 광고
+        goToNextAd();
+    }
+}
+
+// 이전 광고로 이동
+function goToPrevAd() {
+    if (advertisementsData.length <= 1) return;
+    
+    currentAd = (currentAd - 1 + advertisementsData.length) % advertisementsData.length;
+    updateAdSlider();
+}
+
+// 다음 광고로 이동
+function goToNextAd() {
+    if (advertisementsData.length <= 1) return;
+    
+    currentAd = (currentAd + 1) % advertisementsData.length;
+    updateAdSlider();
+}
+
+// 광고 슬라이더 업데이트
+function updateAdSlider() {
+    const adSlider = document.getElementById('ad-slider');
+    if (adSlider) {
+        adSlider.style.transform = `translateX(-${currentAd * 100}%)`;
+        adSlider.style.transition = 'transform 0.3s ease-in-out';
+    }
+}
+
+// 자동 슬라이드 시작 (개별 스크롤 시간 지원)
+function startAutoSlide() {
+    if (advertisementsData.length <= 1) return;
+    
+    pauseAutoSlide(); // 기존 타이머 정리
+    
+    // 현재 광고의 스크롤 시간 가져오기
+    const currentAdData = advertisementsData[currentAd];
+    const scrollInterval = currentAdData?.scroll_interval || 
+                          parseInt(adSettings.default_scroll_interval) || 
+                          3000;
+    
+    adAutoSlideInterval = setTimeout(() => {
+        goToNextAd();
+        startAutoSlide(); // 다음 광고를 위해 재귀 호출
+    }, scrollInterval);
+}
+
+// 자동 슬라이드 일시정지
+function pauseAutoSlide() {
+    if (adAutoSlideInterval) {
+        clearTimeout(adAutoSlideInterval);
+        adAutoSlideInterval = null;
     }
 }
 

@@ -477,14 +477,14 @@ app.get('/api/working-girls', async (c) => {
     
     console.log('Pagination params - page:', page, 'limit:', limit, 'offset:', offset)
     
-    // 워킹걸 기본 정보 조회 (페이지네이션 적용)
+    // 워킹걸 기본 정보 조회 (VIP -> 추천 -> 일반 순서로 정렬)
     const girlsResult = await env.DB.prepare(`
       SELECT id, user_id, nickname, age, height, weight, gender, region, 
-             line_id, kakao_id, phone, management_code, agency, fee, conditions, 
-             main_photo, is_active, is_recommended, created_at, updated_at
+             line_id, kakao_id, phone, management_code, agency, fee, 
+             main_photo, is_active, is_recommended, is_vip, created_at, updated_at
       FROM working_girls 
       WHERE is_active = 1
-      ORDER BY is_recommended DESC, created_at DESC
+      ORDER BY is_vip DESC, is_recommended DESC, created_at DESC
       LIMIT ? OFFSET ?
     `).bind(limit, offset).all()
     
@@ -571,8 +571,8 @@ app.get('/api/working-girls/search', async (c) => {
     const searchPattern = `%${query}%`
     const girlsResult = await env.DB.prepare(`
       SELECT id, user_id, nickname, age, height, weight, gender, region, 
-             line_id, kakao_id, phone, management_code, agency, fee, conditions, 
-             main_photo, is_active, is_recommended, created_at, updated_at
+             line_id, kakao_id, phone, management_code, agency, fee, 
+             main_photo, is_active, is_recommended, is_vip, created_at, updated_at
       FROM working_girls 
       WHERE is_active = 1 AND (
         nickname LIKE ? OR
@@ -581,7 +581,7 @@ app.get('/api/working-girls/search', async (c) => {
         management_code LIKE ? OR
         CAST(age AS TEXT) LIKE ?
       )
-      ORDER BY is_recommended DESC, created_at DESC
+      ORDER BY is_vip DESC, is_recommended DESC, created_at DESC
       LIMIT ? OFFSET ?
     `).bind(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, limit, offset).all()
     
@@ -650,8 +650,8 @@ app.get('/api/working-girls/:id', async (c) => {
   try {
     const girlResult = await env.DB.prepare(`
       SELECT id, user_id, nickname, age, height, weight, gender, region, 
-             line_id, kakao_id, phone, management_code, agency, conditions, 
-             main_photo, is_active, is_recommended, created_at, updated_at
+             line_id, kakao_id, phone, management_code, agency, 
+             main_photo, is_active, is_recommended, is_vip, created_at, updated_at
       FROM working_girls WHERE id = ?
     `).bind(workingGirlId).first()
 
@@ -814,8 +814,8 @@ app.post('/api/auth/working-girl/login', async (c) => {
   try {
     const user = await env.DB.prepare(`
       SELECT id, user_id, nickname, age, height, weight, gender, region, 
-             line_id, kakao_id, phone, management_code, agency, conditions, 
-             main_photo, is_active, is_recommended, created_at, updated_at
+             line_id, kakao_id, phone, management_code, agency, 
+             main_photo, is_active, is_recommended, is_vip, created_at, updated_at
       FROM working_girls WHERE user_id = ? AND password = ?
     `).bind(user_id, password).first()
 
@@ -897,7 +897,7 @@ app.post('/api/auth/verify-session', async (c) => {
       user = await env.DB.prepare(`
         SELECT id, user_id, nickname, age, height, weight, gender, region, 
                line_id, kakao_id, phone, management_code, agency, conditions, 
-               main_photo, is_active, is_recommended, created_at, updated_at
+               main_photo, is_active, is_recommended, is_vip, created_at, updated_at
         FROM working_girls WHERE id = ?
       `).bind(session.user_id).first()
     } else if (session.user_type === 'admin') {
@@ -945,7 +945,7 @@ app.get('/api/working-girl/profile', async (c) => {
     // 워킹걸 정보 조회
     const workingGirl = await env.DB.prepare(`
       SELECT id, user_id, nickname, age, height, weight, gender, region, 
-             line_id, kakao_id, phone, management_code, conditions, main_photo, is_active, is_recommended
+             line_id, kakao_id, phone, management_code, conditions, main_photo, is_active, is_recommended, is_vip
       FROM working_girls WHERE id = ?
     `).bind(session.user_id).first()
     
@@ -1227,6 +1227,7 @@ app.get('/admin', async (c) => {
       stats = await Promise.all([
         env.DB.prepare(`SELECT COUNT(*) as count FROM working_girls`).first(),
         env.DB.prepare(`SELECT COUNT(*) as count FROM working_girls WHERE is_active = 1`).first(),
+        env.DB.prepare(`SELECT COUNT(*) as count FROM working_girls WHERE is_vip = 1`).first(),
         env.DB.prepare(`SELECT COUNT(*) as count FROM working_girls WHERE is_recommended = 1`).first(),
         env.DB.prepare(`SELECT COUNT(*) as count FROM working_girls WHERE region = '방콕'`).first(),
         env.DB.prepare(`SELECT COUNT(*) as count FROM working_girls WHERE region = '파타야'`).first(),
@@ -1296,13 +1297,18 @@ app.get('/admin', async (c) => {
                       <p class="text-gray-600">활성 워킹걸</p>
                   </div>
                   <div class="bg-white p-6 rounded-lg shadow-md text-center">
-                      <i class="fas fa-star text-3xl text-yellow-500 mb-2"></i>
+                      <i class="fas fa-crown text-3xl text-yellow-500 mb-2"></i>
                       <h3 class="text-xl font-bold">${stats[2].count}</h3>
+                      <p class="text-gray-600">VIP 워킹걸</p>
+                  </div>
+                  <div class="bg-white p-6 rounded-lg shadow-md text-center">
+                      <i class="fas fa-star text-3xl text-blue-500 mb-2"></i>
+                      <h3 class="text-xl font-bold">${stats[3].count}</h3>
                       <p class="text-gray-600">추천 워킹걸</p>
                   </div>
                   <div class="bg-white p-6 rounded-lg shadow-md text-center">
                       <i class="fas fa-map-marker-alt text-3xl text-red-500 mb-2"></i>
-                      <h3 class="text-xl font-bold">${stats[3].count + stats[4].count + stats[5].count + stats[6].count}</h3>
+                      <h3 class="text-xl font-bold">${stats[4].count + stats[5].count + stats[6].count + stats[7].count}</h3>
                       <p class="text-gray-600">전체 지역</p>
                   </div>
               </div>
@@ -1358,6 +1364,7 @@ app.get('/admin', async (c) => {
                               <tr>
                                   <th class="px-4 py-3 text-left">에이전시</th>
                                   <th class="px-4 py-3 text-left">관리코드</th>
+                                  <th class="px-4 py-3 text-left">VIP</th>
                                   <th class="px-4 py-3 text-left">추천</th>
                                   <th class="px-4 py-3 text-left">거주지역</th>
                                   <th class="px-4 py-3 text-left">아이디</th>
@@ -1427,7 +1434,7 @@ app.get('/admin', async (c) => {
                                       <select id="wg_gender" name="gender"
                                               class="w-full p-3 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none">
                                           <option value="female">여성</option>
-                                          <option value="male">남성</option>
+                                          <option value="male">레이디보이</option>
                                           <option value="trans">트랜스젠더</option>
                                       </select>
                                   </div>
@@ -1497,16 +1504,35 @@ app.get('/admin', async (c) => {
                               <!-- 설정 섹션 -->
                               <div class="border-t pt-6">
                                   <h4 class="text-lg font-medium mb-4">설정</h4>
-                                  <div class="flex space-x-6">
-                                      <label class="flex items-center space-x-2">
-                                          <input type="checkbox" id="wg_is_recommended" name="is_recommended"
-                                                 class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
-                                          <span>추천 워킹걸</span>
-                                      </label>
-                                      <label class="flex items-center space-x-2">
+                                  
+                                  <!-- 등급 선택 (라디오 버튼) -->
+                                  <div class="mb-4">
+                                      <h5 class="text-md font-medium mb-2">등급 선택</h5>
+                                      <div class="flex space-x-4">
+                                          <label class="flex items-center space-x-2 cursor-pointer">
+                                              <input type="radio" id="wg_grade_normal" name="grade" value="normal" checked
+                                                     class="w-4 h-4 text-gray-600 border-gray-300 focus:ring-gray-500">
+                                              <span class="text-gray-700 font-medium">📝 일반</span>
+                                          </label>
+                                          <label class="flex items-center space-x-2 cursor-pointer">
+                                              <input type="radio" id="wg_grade_recommended" name="grade" value="recommended"
+                                                     class="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500">
+                                              <span class="text-blue-600 font-medium">⭐ 추천</span>
+                                          </label>
+                                          <label class="flex items-center space-x-2 cursor-pointer">
+                                              <input type="radio" id="wg_grade_vip" name="grade" value="vip"
+                                                     class="w-4 h-4 text-yellow-600 border-gray-300 focus:ring-yellow-500">
+                                              <span class="text-yellow-600 font-medium">👑 VIP</span>
+                                          </label>
+                                      </div>
+                                  </div>
+                                  
+                                  <!-- 활성 상태 -->
+                                  <div>
+                                      <label class="flex items-center space-x-2 cursor-pointer">
                                           <input type="checkbox" id="wg_is_active" name="is_active" checked
-                                                 class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
-                                          <span>활성 상태</span>
+                                                 class="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500">
+                                          <span class="text-green-600 font-medium">활성 상태</span>
                                       </label>
                                   </div>
                               </div>
@@ -1563,8 +1589,35 @@ app.get('/admin', async (c) => {
               <div class="bg-white rounded-lg shadow-md p-6 mt-8">
                   <h2 class="text-xl font-bold mb-4">광고 관리</h2>
                   
+                  <!-- 광고 전역 설정 -->
+                  <div class="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                      <h3 class="text-lg font-semibold mb-3">📋 광고 전역 설정</h3>
+                      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div>
+                              <label class="block text-sm font-medium mb-2">기본 스크롤 간격 (초)</label>
+                              <input type="number" id="default-scroll-interval" min="1" max="60" value="3" 
+                                     class="w-full p-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none">
+                          </div>
+                          <div>
+                              <label class="block text-sm font-medium mb-2">최대 우선순위</label>
+                              <input type="number" id="max-priority" min="1" max="100" value="10" 
+                                     class="w-full p-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none">
+                          </div>
+                          <div>
+                              <label class="block text-sm font-medium mb-2">최적 배너 크기</label>
+                              <input type="text" id="optimal-banner-size" value="1200x300px" readonly
+                                     class="w-full p-2 border border-gray-300 rounded-lg bg-gray-100">
+                          </div>
+                      </div>
+                      <button onclick="updateAdSettings()" 
+                              class="mt-3 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded">
+                          <i class="fas fa-save mr-2"></i>설정 저장
+                      </button>
+                  </div>
+                  
                   <!-- 광고 업로드 -->
                   <div class="mb-6 p-4 border-2 border-dashed border-gray-300 rounded-lg">
+                      <h3 class="text-lg font-semibold mb-3">📢 새 광고 업로드</h3>
                       <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
                           <div>
                               <label class="block text-sm font-medium mb-2">광고 제목 (선택사항)</label>
@@ -1578,8 +1631,35 @@ app.get('/admin', async (c) => {
                               <p class="text-xs text-gray-500 mt-1">광고 클릭 시 이동할 페이지 주소</p>
                           </div>
                       </div>
+                      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-3">
+                          <div>
+                              <label class="block text-sm font-medium mb-2">우선순위 (1-10)</label>
+                              <input type="number" id="ad-priority" min="1" max="10" value="5" 
+                                     class="w-full p-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none">
+                          </div>
+                          <div>
+                              <label class="block text-sm font-medium mb-2">스크롤 시간 (초)</label>
+                              <input type="number" id="ad-scroll-time" min="1" max="60" value="3" 
+                                     class="w-full p-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none">
+                          </div>
+                          <div>
+                              <label class="block text-sm font-medium mb-2">광고 기간</label>
+                              <select id="ad-duration" 
+                                      class="w-full p-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none">
+                                  <option value="">기간 제한 없음</option>
+                                  <option value="2주일">2주일</option>
+                                  <option value="1달">1달</option>
+                                  <option value="1년">1년</option>
+                              </select>
+                          </div>
+                      </div>
                       <div class="mb-3">
-                          <label class="block text-sm font-medium mb-2">광고 이미지 *</label>
+                          <label class="block text-sm font-medium mb-2">
+                              광고 이미지 * 
+                              <span class="text-blue-600 font-medium ml-2">
+                                  (최적 크기: <span id="optimal-size-display">1200x300px</span>)
+                              </span>
+                          </label>
                           <input type="file" id="ad-upload" accept="image/*" 
                                  class="w-full p-2 border border-gray-300 rounded-lg">
                           <p class="text-xs text-gray-500 mt-1">최대 10MB, 이미지 파일만 업로드 가능</p>
@@ -1599,7 +1679,7 @@ app.get('/admin', async (c) => {
 
           <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
           <script src="/static/admin.js"></script>
-          <script src="/static/admin-photo.js"></script>
+          <script src="/static/admin-photo-v2.js"></script>
       </body>
       </html>
     `)
@@ -1756,16 +1836,24 @@ app.post('/api/admin/working-girls', async (c) => {
     // 성별 변환
     const genderMap = {
       'female': '여자',
-      'male': '남자', 
+      'male': '레이디보이', 
       'trans': '트랜스젠더'
     }
     const gender = genderMap[formData.get('gender')?.toString() || 'female'] || '여자'
+    
+    // VIP/추천 상호 배타성 검증
+    const isVip = formData.get('is_vip') === 'true'
+    const isRecommended = formData.get('is_recommended') === 'true'
+    
+    // VIP와 추천이 동시에 선택된 경우 VIP 우선, 추천은 false로 설정
+    const finalIsVip = isVip
+    const finalIsRecommended = isVip ? false : isRecommended
 
     // 워킹걸 데이터 삽입
     const result = await env.DB.prepare(`
       INSERT INTO working_girls (
         user_id, password, nickname, age, height, weight, gender, region,
-        phone, line_id, kakao_id, management_code, agency, fee, conditions, is_recommended, is_active
+        phone, line_id, kakao_id, management_code, agency, fee, is_vip, is_recommended, is_active
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       user_id,
@@ -1782,8 +1870,8 @@ app.post('/api/admin/working-girls', async (c) => {
       management_code,
       formData.get('agency')?.toString() || '',
       formData.get('fee')?.toString() || '',
-      formData.get('conditions')?.toString() || '',
-      formData.get('is_recommended') === 'true' ? 1 : 0,
+      finalIsVip ? 1 : 0,
+      finalIsRecommended ? 1 : 0,
       formData.get('is_active') !== 'false' ? 1 : 0
     ).run()
 
@@ -1806,19 +1894,34 @@ app.put('/api/admin/working-girls/:id', async (c) => {
   const { env } = c
   const workingGirlId = c.req.param('id')
   
+  console.log(`🎯 워킹걸 수정 요청 - ID: ${workingGirlId}`)
+  
   try {
     const formData = await c.req.formData()
+    
+    // 받은 FormData 로깅
+    console.log('🔍 서버에서 받은 FormData:')
+    for (const [key, value] of formData.entries()) {
+      console.log(`  ${key}: ${value} (타입: ${typeof value})`)
+    }
     
     // 워킹걸 존재 확인
     const existingGirl = await env.DB.prepare(`
       SELECT id, user_id, nickname, age, height, weight, gender, region, 
-             line_id, kakao_id, phone, management_code, agency, conditions, 
-             main_photo, is_active, is_recommended, created_at, updated_at
+             line_id, kakao_id, phone, management_code, agency, 
+             main_photo, is_active, is_recommended, is_vip, created_at, updated_at
       FROM working_girls WHERE id = ?
     `).bind(workingGirlId).first()
     if (!existingGirl) {
       return c.json({ success: false, message: '존재하지 않는 워킹걸입니다.' }, 404)
     }
+
+    console.log('📋 기존 워킹걸 정보:', {
+      id: existingGirl.id,
+      nickname: existingGirl.nickname,
+      is_vip: existingGirl.is_vip,
+      is_recommended: existingGirl.is_recommended
+    })
 
     // 아이디 중복 체크 (현재 사용자 제외)
     const user_id = formData.get('username')?.toString()
@@ -1832,10 +1935,34 @@ app.put('/api/admin/working-girls/:id', async (c) => {
     // 성별 변환
     const genderMap = {
       'female': '여자',
-      'male': '남자', 
+      'male': '레이디보이', 
       'trans': '트랜스젠더'
     }
     const gender = genderMap[formData.get('gender')?.toString() || 'female'] || existingGirl.gender
+    
+    // VIP/추천 상호 배타성 검증
+    // 체크박스는 브라우저에서 'on' 또는 JavaScript에서 'true'로 전송될 수 있음
+    const vipRawValue = formData.get('is_vip')
+    const recommendedRawValue = formData.get('is_recommended')
+    
+    const isVip = vipRawValue === 'true' || vipRawValue === 'on' || vipRawValue === true
+    const isRecommended = recommendedRawValue === 'true' || recommendedRawValue === 'on' || recommendedRawValue === true
+    
+    console.log('🎯 VIP/추천 값 파싱:', {
+      is_vip_raw: formData.get('is_vip'),
+      is_recommended_raw: formData.get('is_recommended'),
+      isVip_parsed: isVip,
+      isRecommended_parsed: isRecommended
+    })
+    
+    // VIP와 추천이 동시에 선택된 경우 VIP 우선, 추천은 false로 설정
+    const finalIsVip = isVip
+    const finalIsRecommended = isVip ? false : isRecommended
+    
+    console.log('✨ 최종 VIP/추천 값:', {
+      finalIsVip,
+      finalIsRecommended
+    })
 
     // 관리코드 필수 검증 및 중복 확인
     const management_code = formData.get('management_code')?.toString()
@@ -1853,8 +1980,8 @@ app.put('/api/admin/working-girls/:id', async (c) => {
     await env.DB.prepare(`
       UPDATE working_girls SET
         user_id = ?, nickname = ?, age = ?, height = ?, weight = ?,
-        gender = ?, region = ?, phone = ?, line_id = ?, kakao_id = ?, management_code = ?, agency = ?, fee = ?, conditions = ?,
-        is_recommended = ?, is_active = ?
+        gender = ?, region = ?, phone = ?, line_id = ?, kakao_id = ?, management_code = ?, agency = ?, fee = ?,
+        is_vip = ?, is_recommended = ?, is_active = ?
       WHERE id = ?
     `).bind(
       user_id || existingGirl.user_id,
@@ -1870,8 +1997,8 @@ app.put('/api/admin/working-girls/:id', async (c) => {
       management_code,
       formData.get('agency')?.toString() || existingGirl.agency || '',
       formData.get('fee')?.toString() || existingGirl.fee || '',
-      formData.get('conditions')?.toString() || existingGirl.conditions || '',
-      formData.get('is_recommended') === 'true' ? 1 : 0,
+      finalIsVip ? 1 : 0,
+      finalIsRecommended ? 1 : 0,
       formData.get('is_active') !== 'false' ? 1 : 0,
       workingGirlId
     ).run()
@@ -2027,8 +2154,8 @@ app.get('/api/admin/working-girls', async (c) => {
     // 워킹걸 기본 정보 조회
     let query = `
       SELECT id, user_id, nickname, age, height, weight, gender, region, 
-             line_id, kakao_id, phone, management_code, agency, conditions, 
-             main_photo, is_active, is_recommended, created_at, updated_at
+             line_id, kakao_id, phone, management_code, agency, 
+             main_photo, is_active, is_recommended, is_vip, created_at, updated_at
       FROM working_girls
     `
     let params = []
@@ -2038,7 +2165,7 @@ app.get('/api/admin/working-girls', async (c) => {
       params = [`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`]
     }
     
-    query += ` ORDER BY created_at DESC LIMIT 100` // 최대 100개로 제한
+    query += ` ORDER BY is_vip DESC, is_recommended DESC, created_at DESC LIMIT 100` // 최대 100개로 제한
     console.log('Executing query:', query)
     
     const workingGirls = await env.DB.prepare(query).bind(...params).all()
@@ -2103,8 +2230,8 @@ app.get('/api/admin/working-girls/:id', async (c) => {
     // 워킹걸 기본 정보 (패스워드 제외)
     const workingGirl = await env.DB.prepare(`
       SELECT id, user_id, nickname, age, height, weight, gender, region, 
-             line_id, kakao_id, phone, management_code, agency, fee, conditions, 
-             main_photo, is_active, is_recommended, created_at, updated_at
+             line_id, kakao_id, phone, management_code, agency, fee, 
+             main_photo, is_active, is_recommended, is_vip, created_at, updated_at
       FROM working_girls WHERE id = ?
     `).bind(workingGirlId).first()
     if (!workingGirl) {
@@ -2128,7 +2255,7 @@ app.get('/api/admin/working-girls/:id', async (c) => {
   }
 })
 
-// 광고 업로드 API
+// 광고 업로드 API (우선순위 중복 방지 포함)
 app.post('/api/admin/advertisements', async (c) => {
   const { env } = c
   
@@ -2137,6 +2264,9 @@ app.post('/api/admin/advertisements', async (c) => {
     const adFile = formData.get('advertisement') as File
     const title = formData.get('title')?.toString() || ''
     const linkUrl = formData.get('link_url')?.toString() || ''
+    let displayOrder = parseInt(formData.get('display_order')?.toString() || '1')
+    const scrollInterval = parseInt(formData.get('scroll_interval')?.toString() || '3000')
+    const duration = formData.get('duration')?.toString() || ''
     
     if (!adFile || adFile.size === 0) {
       return c.json({ success: false, message: '광고 이미지를 선택해주세요.' }, 400)
@@ -2151,6 +2281,9 @@ app.post('/api/admin/advertisements', async (c) => {
     if (!adFile.type.startsWith('image/')) {
       return c.json({ success: false, message: '이미지 파일만 업로드 가능합니다.' }, 400)
     }
+
+    // 사용할 우선순위 결정 (중복 방지)
+    displayOrder = await getAvailablePriority(env.DB, displayOrder)
 
     const buffer = await adFile.arrayBuffer()
     
@@ -2171,18 +2304,31 @@ app.post('/api/admin/advertisements', async (c) => {
     const mimeType = adFile.type
     const dataUrl = `data:${mimeType};base64,${base64}`
 
-    // 현재 최대 순서 가져오기
-    const maxOrderResult = await env.DB.prepare(`
-      SELECT MAX(display_order) as max_order FROM advertisements
-    `).first()
-    
-    const nextOrder = (maxOrderResult?.max_order || 0) + 1
+    // 만료일 처리
+    let expiresAt = null
+    if (duration && ['2주일', '1달', '1년'].includes(duration)) {
+      const now = new Date()
+      if (duration === '2주일') {
+        now.setDate(now.getDate() + 14)
+      } else if (duration === '1달') {
+        now.setMonth(now.getMonth() + 1)
+      } else if (duration === '1년') {
+        now.setFullYear(now.getFullYear() + 1)
+      }
+      expiresAt = now.toISOString()
+    }
 
-    // 광고 데이터 삽입
+    // 지정된 우선순위에 기존 광고가 있으면 뒤로 밀기
+    await shiftAdvertisementPriorities(env.DB, displayOrder)
+
+    // 광고 데이터 삽입 (향상된 필드 포함)
     const result = await env.DB.prepare(`
-      INSERT INTO advertisements (image_url, title, link_url, display_order, is_active)
-      VALUES (?, ?, ?, ?, 1)
-    `).bind(dataUrl, title, linkUrl, nextOrder).run()
+      INSERT INTO advertisements (image_url, title, link_url, display_order, scroll_interval, expires_at, is_active)
+      VALUES (?, ?, ?, ?, ?, ?, 1)
+    `).bind(dataUrl, title, linkUrl, displayOrder, scrollInterval, expiresAt).run()
+
+    // 전체 우선순위 재정렬
+    await reorderAdvertisementPriorities(env.DB)
 
     return c.json({ 
       success: true, 
@@ -2196,19 +2342,87 @@ app.post('/api/admin/advertisements', async (c) => {
   }
 })
 
-// 관리자용 광고 목록 조회 API
+// 사용 가능한 우선순위 찾기
+async function getAvailablePriority(db, requestedPriority) {
+  try {
+    const existingAd = await db.prepare(`
+      SELECT id FROM advertisements WHERE display_order = ?
+    `).bind(requestedPriority).first()
+    
+    if (!existingAd) {
+      return requestedPriority // 요청한 우선순위가 비어있으면 그대로 사용
+    }
+    
+    // 다음 사용 가능한 우선순위 찾기
+    const maxOrder = await db.prepare(`
+      SELECT MAX(display_order) as max_order FROM advertisements
+    `).first()
+    
+    return (maxOrder?.max_order || 0) + 1
+    
+  } catch (error) {
+    console.error('Get available priority error:', error)
+    return requestedPriority
+  }
+}
+
+// 광고 우선순위 뒤로 밀기
+async function shiftAdvertisementPriorities(db, fromPriority) {
+  try {
+    // 지정된 우선순위부터 뒤의 모든 광고들을 1씩 뒤로 밀기
+    await db.prepare(`
+      UPDATE advertisements 
+      SET display_order = display_order + 1 
+      WHERE display_order >= ?
+    `).bind(fromPriority).run()
+    
+  } catch (error) {
+    console.error('Shift advertisement priorities error:', error)
+  }
+}
+
+// 관리자용 광고 목록 조회 API (우선순위 정렬 및 재배열 포함)
 app.get('/api/admin/advertisements', async (c) => {
   const { env } = c
   
   try {
+    // 만료된 광고 자동 비활성화
+    await env.DB.prepare(`
+      UPDATE advertisements 
+      SET is_active = 0 
+      WHERE expires_at IS NOT NULL AND expires_at <= datetime('now')
+    `).run()
+    
+    // 우선순위 중복 제거 및 재정렬
+    await reorderAdvertisementPriorities(env.DB)
+    
     const ads = await env.DB.prepare(`
-      SELECT * FROM advertisements 
+      SELECT *, 
+        CASE 
+          WHEN expires_at IS NOT NULL AND expires_at <= datetime('now') THEN 1
+          ELSE 0
+        END as is_expired
+      FROM advertisements 
       ORDER BY display_order ASC, created_at DESC
     `).all()
 
+    // 광고 설정도 함께 조회
+    const settings = await env.DB.prepare(`
+      SELECT setting_key, setting_value 
+      FROM advertisement_settings
+    `).all()
+    
+    const settingsObj = {}
+    if (settings.results) {
+      settings.results.forEach(setting => {
+        settingsObj[setting.setting_key] = setting.setting_value
+      })
+    }
+
     return c.json({ 
       success: true, 
-      advertisements: ads.results || []
+      advertisements: ads.results || [],
+      settings: settingsObj
     })
     
   } catch (error) {
@@ -2217,21 +2431,92 @@ app.get('/api/admin/advertisements', async (c) => {
   }
 })
 
-// 메인 페이지용 활성 광고 목록 조회 API
+// 광고 우선순위 재정렬 함수 (완전한 순차 정렬)
+async function reorderAdvertisementPriorities(db) {
+  try {
+    // 모든 광고를 현재 우선순위 순으로 가져오기 (음수 포함하여 정렬)
+    const ads = await db.prepare(`
+      SELECT id, display_order 
+      FROM advertisements 
+      ORDER BY display_order ASC, created_at ASC
+    `).all()
+    
+    if (!ads.results || ads.results.length === 0) {
+      console.log('재정렬할 광고가 없습니다.')
+      return
+    }
+    
+    console.log(`총 ${ads.results.length}개 광고 우선순위 재정렬 시작`)
+    
+    // 모든 광고를 임시 우선순위로 설정하여 충돌 방지
+    for (let i = 0; i < ads.results.length; i++) {
+      const tempPriority = -(i + 1000) // 큰 음수로 설정하여 충돌 완전 방지
+      await db.prepare(`
+        UPDATE advertisements 
+        SET display_order = ? 
+        WHERE id = ?
+      `).bind(tempPriority, ads.results[i].id).run()
+    }
+    
+    // 1부터 순차적으로 우선순위 재할당
+    for (let i = 0; i < ads.results.length; i++) {
+      const newPriority = i + 1
+      await db.prepare(`
+        UPDATE advertisements 
+        SET display_order = ? 
+        WHERE id = ?
+      `).bind(newPriority, ads.results[i].id).run()
+      
+      console.log(`광고 ID ${ads.results[i].id}: 우선순위 ${newPriority} 할당`)
+    }
+    
+    console.log(`광고 우선순위 재정렬 완료: ${ads.results.length}개 광고가 1부터 ${ads.results.length}까지 순차 정렬됨`)
+    
+  } catch (error) {
+    console.error('Advertisement priority reorder error:', error)
+    throw error
+  }
+}
+
+// 메인 페이지용 활성 광고 목록 조회 API (우선순위 정렬 포함)
 app.get('/api/advertisements', async (c) => {
   const { env } = c
   
   try {
+    // 만료된 광고 자동 비활성화
+    await env.DB.prepare(`
+      UPDATE advertisements 
+      SET is_active = 0 
+      WHERE expires_at IS NOT NULL AND expires_at <= datetime('now')
+    `).run()
+    
+    // 우선순위 재정렬 (메인 페이지에서도 정확한 순서 보장)
+    await reorderAdvertisementPriorities(env.DB)
+    
     const activeAds = await env.DB.prepare(`
-      SELECT id, image_url, title, link_url, display_order 
+      SELECT id, image_url, title, link_url, display_order, scroll_interval
       FROM advertisements 
-      WHERE is_active = 1 
-      ORDER BY display_order ASC
+      WHERE is_active = 1 AND (expires_at IS NULL OR expires_at > datetime('now'))
+      ORDER BY display_order ASC, created_at ASC
     `).all()
+
+    // 광고 설정 조회
+    const settings = await env.DB.prepare(`
+      SELECT setting_key, setting_value 
+      FROM advertisement_settings
+    `).all()
+    
+    const settingsObj = {}
+    if (settings.results) {
+      settings.results.forEach(setting => {
+        settingsObj[setting.setting_key] = setting.setting_value
+      })
+    }
 
     return c.json({ 
       success: true, 
-      advertisements: activeAds.results || []
+      advertisements: activeAds.results || [],
+      settings: settingsObj
     })
     
   } catch (error) {
@@ -2265,17 +2550,46 @@ app.delete('/api/admin/advertisements/:id', async (c) => {
   }
 })
 
-// 광고 정보 업데이트 API
+// 광고 정보 업데이트 API (우선순위 중복 방지 포함)
 app.put('/api/admin/advertisements/:id', async (c) => {
   const { env } = c
   const adId = c.req.param('id')
   
   try {
-    const { title, link_url } = await c.req.json()
+    const { title, link_url, display_order, scroll_interval, expires_at, is_active } = await c.req.json()
     
+    // 우선순위 변경이 요청된 경우 전체 재정렬 수행
+    if (display_order !== undefined) {
+      await handlePriorityChange(env.DB, adId, display_order)
+    }
+    
+    // 만료일 처리 (기간 선택이 있는 경우 현재 시간에서 추가)
+    let expiresAtValue = expires_at
+    if (typeof expires_at === 'string' && ['2주일', '1달', '1년'].includes(expires_at)) {
+      const now = new Date()
+      if (expires_at === '2주일') {
+        now.setDate(now.getDate() + 14)
+      } else if (expires_at === '1달') {
+        now.setMonth(now.getMonth() + 1)
+      } else if (expires_at === '1년') {
+        now.setFullYear(now.getFullYear() + 1)
+      }
+      expiresAtValue = now.toISOString()
+    }
+    
+    // 우선순위 변경이 있었던 경우, 다른 필드도 함께 업데이트
     const result = await env.DB.prepare(`
-      UPDATE advertisements SET title = ?, link_url = ? WHERE id = ?
-    `).bind(title || '', link_url || '', adId).run()
+      UPDATE advertisements 
+      SET title = ?, link_url = ?, scroll_interval = ?, expires_at = ?, is_active = ?
+      WHERE id = ?
+    `).bind(
+      title || '', 
+      link_url || '', 
+      scroll_interval || 3000, 
+      expiresAtValue || null, 
+      is_active !== undefined ? (is_active ? 1 : 0) : 1,
+      adId
+    ).run()
 
     if (result.changes === 0) {
       return c.json({ success: false, message: '존재하지 않는 광고입니다.' }, 404)
@@ -2291,6 +2605,65 @@ app.put('/api/admin/advertisements/:id', async (c) => {
     return c.json({ success: false, message: '광고 정보 업데이트 중 오류가 발생했습니다.' }, 500)
   }
 })
+
+// 광고 우선순위 변경 처리 함수 (완전한 중복 방지 및 자동 재정렬)
+async function handlePriorityChange(db, adId, newPriority) {
+  try {
+    // 현재 광고의 기존 우선순위 확인
+    const currentAd = await db.prepare(`
+      SELECT display_order FROM advertisements WHERE id = ?
+    `).bind(adId).first()
+    
+    if (!currentAd) return
+    
+    const oldPriority = currentAd.display_order
+    
+    // 우선순위가 변경되지 않았으면 처리하지 않음
+    if (oldPriority === newPriority) return
+    
+    // 임시로 해당 광고의 우선순위를 -1로 설정 (충돌 방지)
+    await db.prepare(`
+      UPDATE advertisements 
+      SET display_order = -1 
+      WHERE id = ?
+    `).bind(adId).run()
+    
+    // 우선순위가 올라가는 경우 (newPriority < oldPriority)
+    if (newPriority < oldPriority) {
+      // newPriority 이상 oldPriority 미만인 모든 광고를 +1씩 이동
+      await db.prepare(`
+        UPDATE advertisements 
+        SET display_order = display_order + 1 
+        WHERE display_order >= ? AND display_order < ? AND id != ?
+      `).bind(newPriority, oldPriority, adId).run()
+    }
+    // 우선순위가 내려가는 경우 (newPriority > oldPriority)  
+    else {
+      // oldPriority 초과 newPriority 이하인 모든 광고를 -1씩 이동
+      await db.prepare(`
+        UPDATE advertisements 
+        SET display_order = display_order - 1 
+        WHERE display_order > ? AND display_order <= ? AND id != ?
+      `).bind(oldPriority, newPriority, adId).run()
+    }
+    
+    // 해당 광고를 새로운 우선순위로 설정
+    await db.prepare(`
+      UPDATE advertisements 
+      SET display_order = ? 
+      WHERE id = ?
+    `).bind(newPriority, adId).run()
+    
+    // 전체 우선순위를 1부터 순차적으로 정규화
+    await reorderAdvertisementPriorities(db)
+    
+    console.log(`광고 ${adId}의 우선순위가 ${oldPriority}에서 ${newPriority}로 변경되고 전체 재정렬 완료`)
+    
+  } catch (error) {
+    console.error('Priority change handling error:', error)
+    throw error
+  }
+}
 
 // 만남요청 텔레그램 전송 API
 app.post('/api/meeting-request', async (c) => {
@@ -2495,6 +2868,77 @@ app.delete('/api/admin/advertisements/cleanup', async (c) => {
   } catch (error) {
     console.error('Advertisement cleanup error:', error)
     return c.json({ success: false, message: '광고 정리 중 오류가 발생했습니다.' }, 500)
+  }
+})
+
+// 광고 설정 조회 API
+app.get('/api/admin/advertisement-settings', async (c) => {
+  const { env } = c
+  
+  try {
+    const settings = await env.DB.prepare(`
+      SELECT setting_key, setting_value FROM advertisement_settings
+    `).all()
+    
+    const settingsObj = {}
+    if (settings.results) {
+      settings.results.forEach(setting => {
+        settingsObj[setting.setting_key] = setting.setting_value
+      })
+    }
+    
+    // 기본값 설정
+    const defaultSettings = {
+      default_scroll_interval: '3000',
+      max_priority: '10',
+      optimal_banner_size: '1200x300px'
+    }
+    
+    // 설정이 없는 경우 기본값 사용
+    Object.keys(defaultSettings).forEach(key => {
+      if (!settingsObj[key]) {
+        settingsObj[key] = defaultSettings[key]
+      }
+    })
+
+    return c.json({ 
+      success: true, 
+      settings: settingsObj
+    })
+    
+  } catch (error) {
+    console.error('Advertisement settings get error:', error)
+    return c.json({ success: false, message: '광고 설정 조회 중 오류가 발생했습니다.' }, 500)
+  }
+})
+
+// 광고 설정 업데이트 API
+app.put('/api/admin/advertisement-settings', async (c) => {
+  const { env } = c
+  
+  try {
+    const { settings } = await c.req.json()
+    
+    if (!settings || typeof settings !== 'object') {
+      return c.json({ success: false, message: '설정 데이터가 올바르지 않습니다.' }, 400)
+    }
+    
+    // 각 설정을 개별적으로 업데이트
+    for (const [key, value] of Object.entries(settings)) {
+      await env.DB.prepare(`
+        INSERT OR REPLACE INTO advertisement_settings (setting_key, setting_value)
+        VALUES (?, ?)
+      `).bind(key, value.toString()).run()
+    }
+
+    return c.json({ 
+      success: true, 
+      message: '광고 설정이 성공적으로 업데이트되었습니다.'
+    })
+    
+  } catch (error) {
+    console.error('Advertisement settings update error:', error)
+    return c.json({ success: false, message: '광고 설정 업데이트 중 오류가 발생했습니다.' }, 500)
   }
 })
 

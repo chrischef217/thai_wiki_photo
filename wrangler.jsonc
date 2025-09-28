@@ -9,8 +9,8 @@
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "thai-wiki-production",
-      "database_id": "1812dba0-f7b0-4f37-954f-79e916930682"
+      "database_name": "webapp-production",
+      "database_id": "ad260611-9ad0-48a3-9615-2d97db9fa6f8"
     }
   ]
 }

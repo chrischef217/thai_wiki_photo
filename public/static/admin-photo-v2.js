@@ -223,9 +223,33 @@ async function handleWorkingGirlSubmit(e) {
             }
         });
         
-        // 체크박스 처리
-        formData.append('is_recommended', document.getElementById('wg_is_recommended').checked);
-        formData.append('is_active', document.getElementById('wg_is_active').checked);
+        // 등급 라디오 버튼 처리 (안전하게)
+        let vipChecked = false;
+        let recommendedChecked = false;
+        
+        const vipRadio = document.querySelector('#wg_grade_vip');
+        const recommendedRadio = document.querySelector('#wg_grade_recommended');
+        const activeElement = document.querySelector('#wg_is_active');
+        
+        // 라디오 버튼 상태 확인 (안전하게)
+        if (vipRadio && vipRadio.checked) {
+            vipChecked = true;
+            recommendedChecked = false;
+        } else if (recommendedRadio && recommendedRadio.checked) {
+            vipChecked = false;
+            recommendedChecked = true;
+        } else {
+            vipChecked = false;
+            recommendedChecked = false;
+        }
+        
+        // 활성 상태 확인 (안전하게)
+        const activeChecked = activeElement ? activeElement.checked : true; // 기본값 true
+        
+        // FormData에 추가
+        formData.append('is_vip', vipChecked ? 'true' : 'false');
+        formData.append('is_recommended', recommendedChecked ? 'true' : 'false');
+        formData.append('is_active', activeChecked ? 'true' : 'false');
         
         // 삭제할 사진 ID 추가 (수정 모드일 때만)
         if (editingId && selectedPhotosToDelete.size > 0) {
