@@ -3242,9 +3242,11 @@ app.post('/api/admin/backup/create', async (c) => {
   const { env } = c
 
   try {
-    // 현재 날짜/시간을 기반으로 백업명 생성
+    // 현재 날짜/시간을 한국 시간 기준으로 백업명 생성
     const now = new Date()
-    const backupName = `백업_${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}`
+    // UTC+9 (한국 시간)으로 변환
+    const koreanTime = new Date(now.getTime() + (9 * 60 * 60 * 1000))
+    const backupName = `백업_${koreanTime.getFullYear()}${String(koreanTime.getMonth() + 1).padStart(2, '0')}${String(koreanTime.getDate()).padStart(2, '0')}_${String(koreanTime.getHours()).padStart(2, '0')}${String(koreanTime.getMinutes()).padStart(2, '0')}${String(koreanTime.getSeconds()).padStart(2, '0')}`
     
     console.log('Creating backup:', backupName)
 
@@ -3252,7 +3254,7 @@ app.post('/api/admin/backup/create', async (c) => {
     const backupMetadata = await env.DB.prepare(`
       INSERT INTO backup_metadata (backup_name, backup_description)
       VALUES (?, ?)
-    `).bind(backupName, `전체 데이터 백업 - ${now.toLocaleString('ko-KR')}`).run()
+    `).bind(backupName, `전체 데이터 백업 - ${koreanTime.toLocaleString('ko-KR')}`).run()
 
     const backupId = backupMetadata.meta.last_row_id
 
@@ -3345,7 +3347,7 @@ app.post('/api/admin/backup/create', async (c) => {
         id: backupId,
         name: backupName,
         size: backupSize,
-        created_at: now.toISOString()
+        created_at: koreanTime.toISOString()
       }
     })
 

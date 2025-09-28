@@ -1392,8 +1392,9 @@ function displayBackupsList(backups) {
             day: '2-digit',
             hour: '2-digit',
             minute: '2-digit',
-            second: '2-digit'
-        });
+            second: '2-digit',
+            timeZone: 'Asia/Seoul'
+        }) + ' (한국시간)';
 
         return `
             <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
@@ -1508,7 +1509,7 @@ async function restoreBackup(backupId, backupName) {
                 `백업이 성공적으로 복원되었습니다!\n\n` +
                 `백업명: ${response.data.backup.name}\n` +
                 `복원된 데이터: ${response.data.backup.restored_count}개 항목\n` +
-                `백업 생성일: ${new Date(response.data.backup.backup_date).toLocaleString('ko-KR')}\n\n` +
+                `백업 생성일: ${new Date(response.data.backup.backup_date).toLocaleString('ko-KR', {timeZone: 'Asia/Seoul'})} (한국시간)\n\n` +
                 `페이지를 새로고침합니다.`
             );
             
