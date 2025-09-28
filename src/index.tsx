@@ -496,7 +496,7 @@ app.get('/api/working-girls', async (c) => {
              main_photo, is_active, is_recommended, is_vip, created_at, updated_at
       FROM working_girls 
       WHERE is_active = 1
-      ORDER BY is_vip DESC, is_recommended DESC, created_at DESC
+      ORDER BY is_vip DESC, is_recommended DESC, created_at DESC, id ASC
       LIMIT ? OFFSET ?
     `).bind(limit, offset).all()
     
@@ -593,7 +593,7 @@ app.get('/api/working-girls/search', async (c) => {
         management_code LIKE ? OR
         CAST(age AS TEXT) LIKE ?
       )
-      ORDER BY is_vip DESC, is_recommended DESC, created_at DESC
+      ORDER BY is_vip DESC, is_recommended DESC, created_at DESC, id ASC
       LIMIT ? OFFSET ?
     `).bind(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, limit, offset).all()
     

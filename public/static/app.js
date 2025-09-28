@@ -290,7 +290,8 @@ function handleScroll() {
     const scrollThreshold = 300; // 300px 전에 미리 로드
     
     if (scrollTop + windowHeight >= documentHeight - scrollThreshold) {
-        console.log('📜 스크롤 하단 도달 - 다음 페이지 로드 | 현재 페이지:', currentPage, '| 더 많은 데이터:', hasMoreData);
+        console.log('📜 스크롤 하단 도달 - 다음 페이지 로드');
+        console.log('📊 현재 상태:', { currentPage, hasMoreData, currentSearchQuery, isLoading });
         showScrollLoading(); // 스크롤 로딩 인디케이터 표시
         loadWorkingGirls(currentSearchQuery, false); // resetData = false로 추가 로드
     }
