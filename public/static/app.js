@@ -15,6 +15,39 @@ let hasMoreData = true;
 let currentSearchQuery = '';
 let isScrollListenerActive = false;
 
+// 사진 라이트박스 함수들 (전역 정의)
+function showPhotoLightbox(photoUrl, nickname) {
+    const lightboxHTML = `
+        <div class="fixed inset-0 bg-black/80 flex items-center justify-center z-[60] photo-lightbox" onclick="closePhotoLightbox(event)">
+            <div class="relative max-w-[90vw] max-h-[90vh] flex items-center justify-center" onclick="event.stopPropagation()">
+                <img src="${photoUrl}" alt="${nickname}" class="max-w-full max-h-full object-contain rounded-lg shadow-2xl">
+                <button onclick="closePhotoLightbox()" class="absolute top-4 right-4 text-white bg-black/50 rounded-full w-10 h-10 flex items-center justify-center hover:bg-black/70 transition-colors">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', lightboxHTML);
+    document.body.style.overflow = 'hidden'; // 배경 스크롤 방지
+}
+
+function closePhotoLightbox(event) {
+    if (event && event.target !== event.currentTarget) return;
+    
+    const lightbox = document.querySelector('.photo-lightbox');
+    if (lightbox) {
+        lightbox.remove();
+        document.body.style.overflow = ''; // 스크롤 복원
+    }
+}
+
+// 전역 함수로 라이트박스 열기
+window.openPhotoLightbox = function(photoUrl, nickname) {
+    console.log('라이트박스 열기:', photoUrl, nickname);
+    showPhotoLightbox(photoUrl, nickname);
+};
+
 // 페이지 로드 시 초기화
 document.addEventListener('DOMContentLoaded', function() {
     initializeApp();
