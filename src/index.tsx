@@ -492,7 +492,7 @@ app.get('/api/working-girls', async (c) => {
     // 워킹걸 기본 정보 조회 (VIP -> 추천 -> 일반 순서로 정렬)
     const girlsResult = await env.DB.prepare(`
       SELECT id, user_id, nickname, age, height, weight, gender, region, 
-             line_id, kakao_id, phone, management_code, agency, conditions, 
+             line_id, kakao_id, phone, management_code, agency, conditions, fee,
              main_photo, is_active, is_recommended, is_vip, created_at, updated_at
       FROM working_girls 
       WHERE is_active = 1
@@ -583,7 +583,7 @@ app.get('/api/working-girls/search', async (c) => {
     const searchPattern = `%${query}%`
     const girlsResult = await env.DB.prepare(`
       SELECT id, user_id, nickname, age, height, weight, gender, region, 
-             line_id, kakao_id, phone, management_code, agency, conditions, 
+             line_id, kakao_id, phone, management_code, agency, conditions, fee,
              main_photo, is_active, is_recommended, is_vip, created_at, updated_at
       FROM working_girls 
       WHERE is_active = 1 AND (
@@ -662,7 +662,7 @@ app.get('/api/working-girls/:id', async (c) => {
   try {
     const girlResult = await env.DB.prepare(`
       SELECT id, user_id, nickname, age, height, weight, gender, region, 
-             line_id, kakao_id, phone, management_code, agency, 
+             line_id, kakao_id, phone, management_code, agency, conditions, fee,
              main_photo, is_active, is_recommended, is_vip, created_at, updated_at
       FROM working_girls WHERE id = ?
     `).bind(workingGirlId).first()

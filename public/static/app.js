@@ -787,12 +787,13 @@ function showWorkingGirlModal(girl) {
                         </div>
                     </div>
 
-                    ${girl.conditions && girl.conditions.trim() !== '' ? `
-                    <!-- 조건 정보 -->
+                    ${(girl.conditions && girl.conditions.trim() !== '') || (girl.fee && girl.fee.trim() !== '') ? `
+                    <!-- 서비스 조건 정보 -->
                     <div class="mb-6">
                         <div class="bg-gray-50 p-4 rounded-lg">
-                            <h4 class="font-semibold text-gray-800 mb-3">조건</h4>
-                            <div class="text-gray-700 whitespace-pre-line">${girl.conditions}</div>
+                            <h4 class="font-semibold text-gray-800 mb-3">서비스 조건</h4>
+                            ${girl.fee && girl.fee.trim() !== '' ? `<div class="text-gray-700 whitespace-pre-line mb-3">${girl.fee}</div>` : ''}
+                            ${girl.conditions && girl.conditions.trim() !== '' ? `<div class="text-gray-700 whitespace-pre-line">${girl.conditions}</div>` : ''}
                         </div>
                     </div>
                     ` : ''}
