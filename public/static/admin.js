@@ -286,8 +286,25 @@ async function editWorkingGirl(workingGirlId) {
             document.getElementById('wg_line_id').value = workingGirl.line_id || '';
             document.getElementById('wg_wechat_id').value = workingGirl.kakao_id || '';
             
+            // 올바른 값 할당 
+            // wg_fee 필드(워킹걸 페이 라벨)에는 fee 값을 (관리자용 수수료)  
+            // wg_conditions 필드(서비스 조건 라벨)에는 conditions 값을 (고객용 서비스 조건)
+            console.log('🚀 필드 할당 디버깅:', {
+                워킹걸ID: workingGirl.id,
+                닉네임: workingGirl.nickname,
+                fee값: workingGirl.fee,
+                conditions값: workingGirl.conditions,
+                'wg_fee요소': document.getElementById('wg_fee'),
+                'wg_conditions요소': document.getElementById('wg_conditions')
+            });
+            
             document.getElementById('wg_fee').value = workingGirl.fee || '';
             document.getElementById('wg_conditions').value = workingGirl.conditions || '';
+            
+            console.log('✅ 필드 할당 완료:', {
+                'wg_fee_value': document.getElementById('wg_fee').value,
+                'wg_conditions_value': document.getElementById('wg_conditions').value
+            });
             
             // 등급 라디오 버튼 설정
             const normalRadio = document.getElementById('wg_grade_normal');
