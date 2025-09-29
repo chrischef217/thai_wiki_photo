@@ -285,6 +285,7 @@ async function editWorkingGirl(workingGirlId) {
             document.getElementById('wg_phone').value = workingGirl.phone || '';
             document.getElementById('wg_line_id').value = workingGirl.line_id || '';
             document.getElementById('wg_wechat_id').value = workingGirl.kakao_id || '';
+            
             document.getElementById('wg_fee').value = workingGirl.fee || '';
             document.getElementById('wg_conditions').value = workingGirl.conditions || '';
             
