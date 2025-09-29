@@ -2370,7 +2370,7 @@ app.get('/api/admin/working-girls', async (c) => {
     // 워킹걸 기본 정보 조회
     let query = `
       SELECT id, user_id, nickname, age, height, weight, gender, region, 
-             line_id, kakao_id, phone, management_code, agency, 
+             line_id, kakao_id, phone, management_code, agency, conditions, fee,
              main_photo, is_active, is_recommended, is_vip, created_at, updated_at
       FROM working_girls
     `
@@ -2446,7 +2446,7 @@ app.get('/api/admin/working-girls/:id', async (c) => {
     // 워킹걸 기본 정보 (패스워드 제외)
     const workingGirl = await env.DB.prepare(`
       SELECT id, user_id, nickname, age, height, weight, gender, region, 
-             line_id, kakao_id, phone, management_code, agency, fee, 
+             line_id, kakao_id, phone, management_code, agency, conditions, fee, 
              main_photo, is_active, is_recommended, is_vip, created_at, updated_at
       FROM working_girls WHERE id = ?
     `).bind(workingGirlId).first()
